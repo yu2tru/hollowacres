@@ -21,17 +21,25 @@
   <script>
     // Plain (non-module) script: always runs, even when the module below can't load.
     (function () {
+      // Opened from disk? This development page can't load its scripts there,
+      // so jump to the self-contained game file next to it. (In the built
+      // single-file game the module is inline, so this never triggers.)
+      document.addEventListener('DOMContentLoaded', function () {
+        if (location.protocol === 'file:' && document.querySelector('script[type="module"][src]')) {
+          location.replace('HollowAcres.html');
+        }
+      });
       var msg = function (html) { var el = document.getElementById('boot-msg'); if (el) el.innerHTML = html; };
       window.addEventListener('error', function (e) {
         if (window.__HA_STARTED) return;
         if (e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
-          msg('The game files could not be loaded. If you opened <code>index.html</code> from the project folder, run <code>npm install</code> then <code>npm run dev</code> and open <code>http://localhost:5173</code> instead, or open <code>dist/index.html</code> after <code>npm run build</code>.');
+          msg('The game files could not be loaded. Open <b>HollowAcres.html</b> (in the main project folder) instead.');
         } else {
           msg('Something went wrong while starting: ' + String(e.message || e.error) + '<br>Please try a current Chrome, Edge or Firefox with hardware acceleration enabled.');
         }
       }, true);
       setTimeout(function () {
-        if (!window.__HA_STARTED) msg('Still waiting for the game to start. If you opened this file directly from disk, run <code>npm run dev</code> and open <code>http://localhost:5173</code> instead, or use <code>dist/index.html</code> after <code>npm run build</code>.');
+        if (!window.__HA_STARTED) msg('The game didn\'t start. Open <b>HollowAcres.html</b> (in the main project folder) in Chrome, Edge or Firefox on a computer. If that also shows this message, your browser may be too old or have hardware acceleration turned off.');
       }, 6000);
     })();
   </script>
