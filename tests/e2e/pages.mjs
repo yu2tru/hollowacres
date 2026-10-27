@@ -1,0 +1,14 @@
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { chromium } = require('playwright');
+const base = process.argv[2];
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const page = await browser.newPage();
+const errs = []; page.on('pageerror', (e) => errs.push(e.message));
+await page.goto(base);
+await page.waitForTimeout(6000);
+console.log(base, '->', page.url(), 'menu buttons:', await page.locator('.menu-btn').count());
+await page.click('text=New farm'); await page.click('text=Begin');
+await page.waitForFunction(() => window.__HA && window.__HA.state === 'paused' && window.__HA.renderer, null, { timeout: 180000 });
+console.log('game loaded; errors:', errs);
+await browser.close();

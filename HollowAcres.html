@@ -5419,10 +5419,14 @@ varying vec3 vWP;`).replace("#include <normal_fragment_maps>",`
       // Opened from disk? This development page can't load its scripts there,
       // so jump to the self-contained game file next to it. (In the built
       // single-file game the module is inline, so this never triggers.)
+      // This is the unbuilt development page. Outside the Vite dev server
+      // (opened from disk, or served as-is by GitHub Pages / any static host)
+      // its scripts can't load, so go to the self-contained built game.
+      // The built game inlines its script, so this never fires there.
       document.addEventListener('DOMContentLoaded', function () {
-        if (location.protocol === 'file:' && document.querySelector('script[type="module"][src]')) {
-          location.replace('HollowAcres.html');
-        }
+        var unbuilt = document.querySelector('script[type="module"][src*="src/main.js"]');
+        var devServer = document.querySelector('script[src*="@vite/client"]');
+        if (unbuilt && !devServer) location.replace('HollowAcres.html' + location.search);
       });
       var msg = function (html) { var el = document.getElementById('boot-msg'); if (el) el.innerHTML = html; };
       window.addEventListener('error', function (e) {
