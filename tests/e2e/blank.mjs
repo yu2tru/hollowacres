@@ -1,0 +1,12 @@
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { chromium } = require('playwright');
+const url = process.argv[2];
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const page = await browser.newPage();
+page.on('pageerror', (e) => console.log('pageerror', e.message));
+page.on('console', (m) => console.log('console', m.type(), m.text().slice(0, 200)));
+await page.goto(url);
+await page.waitForTimeout(4000);
+console.log('menu buttons:', await page.locator('.menu-btn').count());
+await browser.close();

@@ -6,16 +6,21 @@ You've bought the old Hollis farm in Corran County. During the day you plant, wa
 
 ## Running it
 
-Requirements: Node 18+ and a desktop browser with WebGL 2 (current Chrome, Edge, Firefox or Safari). Keyboard and mouse. Headphones recommended (3D audio).
+**Quickest:** download `HollowAcres.html` from this repo and double-click it. It's the whole game in one file and works offline in a desktop browser with WebGL 2 (current Chrome, Edge, Firefox or Safari). Keyboard and mouse. Headphones recommended (3D audio).
+
+Don't open the project's root `index.html` directly. That's the development page and only works through the dev server.
+
+From source (Node 18+):
 
 ```bash
 npm install
 npm run dev        # play at http://localhost:5173
-npm run build      # production build in dist/ (static files, host anywhere)
+npm run build      # single-file build: dist/index.html (works from disk or any host)
+npm run package    # build and refresh HollowAcres.html in the repo root
 npm run preview    # serve the production build
 ```
 
-`dist/` is a self-contained static site with no external assets or network calls. Every texture, mesh and sound is generated procedurally at load time.
+The build is one self-contained HTML file with no external assets or network calls. Every texture, mesh and sound is generated procedurally at load time.
 
 ## Controls
 

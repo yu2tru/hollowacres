@@ -10,7 +10,8 @@
     "preview": "vite preview --port 4173",
     "test": "node --test tests/unit/*.test.js",
     "sim": "node tests/sim/playthrough.mjs",
-    "e2e": "node tests/e2e/smoke.mjs"
+    "e2e": "node tests/e2e/smoke.mjs",
+    "package": "vite build && node -e \"require('fs').copyFileSync('dist/index.html','HollowAcres.html')\""
   },
   "dependencies": {
     "three": "0.170.0"

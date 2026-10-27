@@ -6,11 +6,35 @@
   <title>Hollow Acres</title>
   <meta name="description" content="First-person farming tycoon by day. Survival horror by night." />
   <link rel="stylesheet" href="./src/ui/ui.css" />
+  <style>
+    #boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #050404; color: #ece4d2; font-family: Georgia, serif; text-align: center; padding: 24px; z-index: 50; }
+    #boot h1 { font-weight: normal; font-size: 44px; margin: 0; }
+    #boot p { color: #b9b0a0; font-family: system-ui, sans-serif; font-size: 14px; max-width: 560px; line-height: 1.5; margin: 0; }
+    #boot code { background: #222; padding: 2px 6px; }
+  </style>
 </head>
 <body>
+  <div id="boot"><h1>Hollow Acres</h1><p id="boot-msg">Loading…</p></div>
   <canvas id="game" tabindex="0"></canvas>
   <div id="ui"></div>
-  <noscript>Hollow Acres needs JavaScript and WebGL 2.</noscript>
+  <noscript><div style="color:#fff;padding:20px">Hollow Acres needs JavaScript and WebGL 2.</div></noscript>
+  <script>
+    // Plain (non-module) script: always runs, even when the module below can't load.
+    (function () {
+      var msg = function (html) { var el = document.getElementById('boot-msg'); if (el) el.innerHTML = html; };
+      window.addEventListener('error', function (e) {
+        if (window.__HA_STARTED) return;
+        if (e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
+          msg('The game files could not be loaded. If you opened <code>index.html</code> from the project folder, run <code>npm install</code> then <code>npm run dev</code> and open <code>http://localhost:5173</code> instead, or open <code>dist/index.html</code> after <code>npm run build</code>.');
+        } else {
+          msg('Something went wrong while starting: ' + String(e.message || e.error) + '<br>Please try a current Chrome, Edge or Firefox with hardware acceleration enabled.');
+        }
+      }, true);
+      setTimeout(function () {
+        if (!window.__HA_STARTED) msg('Still waiting for the game to start. If you opened this file directly from disk, run <code>npm run dev</code> and open <code>http://localhost:5173</code> instead, or use <code>dist/index.html</code> after <code>npm run build</code>.');
+      }, 6000);
+    })();
+  </script>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>
