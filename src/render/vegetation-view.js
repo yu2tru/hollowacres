@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { getVegetation, forestDensity } from '../sim/vegetation.js';
 import { heightAt, distToDriveway, distToPaths, isInPond } from '../sim/terrain.js';
-import { FIELDS, PLOT_PITCH, BUILDINGS, ROAD, LANDMARKS } from '../data/layout.js';
+import { FIELDS, PLOT_PITCH, BUILDINGS, ROAD, LANDMARKS, PEN, FIREPIT } from '../data/layout.js';
 import { tint, shadeByHeight, noiseDisplace, merge, cyl, lin } from './geo-utils.js';
 import { hash2 } from '../core/rng.js';
 
@@ -263,14 +263,17 @@ function grassAllowed(x, z) {
   }
   if (distToDriveway(x, z) < 3) return 0;
   if (Math.abs(z - ROAD.county.z) < ROAD.county.width / 2 + 0.6) return 0;
-  if (distToPaths(x, z) < 1.1) return 0.15;
+  if (distToPaths(x, z) < 1.1) return 0.12;
   for (const b of Object.values(BUILDINGS)) {
-    if (b.r) { if (Math.hypot(x - b.x, z - b.z) < b.r + 0.3) return 0; continue; }
     const pd = b.porch ? b.porch.depth : 0;
     if (Math.abs(x - b.x) < b.w / 2 + 0.4 && z > b.z - b.d / 2 - 0.4 && z < b.z + b.d / 2 + pd + 0.4) return 0;
   }
-  if (Math.hypot(x - 2, z + 6) < 12) return 0.25; // packed yard
-  if (Math.hypot(x - BUILDINGS.barn.x + 8, z - BUILDINGS.barn.z) < 7) return 0.2;
+  if (Math.hypot(x - FIREPIT.x, z - FIREPIT.z) < 9) return 0.15;
+  if (x > 31 && x < 60 && z > -57 && z < -25) return 0.03;            // gravel generator yard
+  if (x > 36 && x < 54 && z > 4.5 && z < 13) return 0.05;             // storage yard
+  if (x > 3 && x < 59 && z > 21 && z < 56) return 0.35;               // solar field
+  if (x > PEN.x0 && x < PEN.x1 && z > PEN.z0 && z < PEN.z1) return 0.45; // scratched-over pen
+  if (Math.hypot(x - BUILDINGS.barn.x + 11, z - BUILDINGS.barn.z) < 6) return 0.2;
   if (isInPond(x, z, 3)) return 0;
   for (const l of LANDMARKS) if (Math.hypot(x - l.x, z - l.z) < l.r * 0.6) return 0.3;
   const fd = forestDensity(x, z);

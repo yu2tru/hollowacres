@@ -367,7 +367,12 @@ export class App {
     A.setListener({ x: cam.position.x, y: cam.position.y, z: cam.position.z }, d);
     // continuous positional loops
     for (const net of sim.rt.networks || []) for (const g of net.gens) A.setLoop('gen_' + g.id, 'generator', g.x, g.z, g.hp > 0 && g.fuel > 0 && (g.mode === 'on' || (g.mode === 'auto' && (sim.state.time.minute >= 1140 || sim.state.time.minute < 390))));
-    for (const s of sim.state.structures) if (s.type === 'decoy') A.setLoop('decoy_' + s.id, 'decoy', s.x, s.z, s.activeUntil > sim.clockSeconds);
+    for (const s of sim.state.structures) {
+      if (s.type === 'decoy') A.setLoop('decoy_' + s.id, 'decoy', s.x, s.z, s.activeUntil > sim.clockSeconds);
+      if (s.type === 'firepit') A.setLoop('fire_' + s.id, 'fire', s.x, s.z, !!s.lit);
+    }
+    const hens = sim.rt.chickens || [];
+    if (hens.length && Math.random() < dt * 0.25) { const c = hens[Math.floor(Math.random() * hens.length)]; if (!c.inside) A.play('cluck', { x: c.x, z: c.z }); }
     const seen = new Set();
     let minD = 999, near = 0;
     const p = sim.state.player;

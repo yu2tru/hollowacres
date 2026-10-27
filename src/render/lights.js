@@ -55,6 +55,10 @@ export class LightPool {
     const pts = [];
     if (sim.rt.housePowered) for (const l of env.lamps) if (l.kind !== 'barn') pts.push({ pos: l.pos, color: 0xffb35e, int: l.kind === 'porch' ? 9 : 14, dist: l.kind === 'porch' ? 12 : 11 });
     for (const l of env.lamps) if (l.kind === 'barn') pts.push({ pos: l.pos, color: 0xffa040, int: 6, dist: 9 });
+    for (const f of sim.state.structures) if (f.type === 'firepit' && f.lit) {
+      const t = sim.clockSeconds;
+      pts.push({ pos: new THREE.Vector3(f.x, heightAt(f.x, f.z) + 0.9, f.z), color: 0xff8a36, int: 16 + Math.sin(t * 11) * 2.5 + Math.sin(t * 27) * 1.5, dist: 16 });
+    }
     for (const f of sim.rt.flares) {
       const age = sim.clockSeconds - f.born;
       pts.push({ pos: new THREE.Vector3(f.x, heightAt(f.x, f.z) + 0.4, f.z), color: 0xff3a22, int: (22 + Math.sin(age * 23) * 4 + Math.sin(age * 7) * 3), dist: 22 });

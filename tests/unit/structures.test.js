@@ -7,24 +7,24 @@ test('placement validation: owned land, blocking, cost', () => {
   const sim = newSim();
   const st = sim.state;
   assert.match(S.canPlace(sim, 'barricade', 100, 0, 0), /land you own/);
-  assert.match(S.canPlace(sim, 'barricade', 17.5, -9, 0), /in the way|structure|doorway/);   // barn wall
-  assert.match(S.canPlace(sim, 'floodlight', 15, 18, 0), /crop fields/);
-  assert.equal(S.canPlace(sim, 'barricade', 30, 2, 0), null);
+  assert.match(S.canPlace(sim, 'barricade', 38.5, -9, 0), /in the way|structure|doorway/);   // barn wall
+  assert.match(S.canPlace(sim, 'floodlight', -8, -45, 0), /crop fields/);
+  assert.equal(S.canPlace(sim, 'barricade', 20, 0, 0), null);
   st.money = 0;
-  const r = S.place(sim, 'barricade', 30, 2, 0);
+  const r = S.place(sim, 'barricade', 20, 0, 0);
   assert.match(r.err, /money/);
   st.money = 500;
-  const ok = S.place(sim, 'barricade', 30, 2, 0);
+  const ok = S.place(sim, 'barricade', 20, 0, 0);
   assert.ok(ok.s);
-  assert.match(S.canPlace(sim, 'barricade', 30, 2, 0), /Overlaps|in the way/);
+  assert.match(S.canPlace(sim, 'barricade', 20, 0, 0), /Overlaps|in the way/);
 });
 
 test('damage -> destroyed breach -> repair restores collision & nav (Tests D, E)', () => {
   const sim = newSim();
   const st = sim.state;
   st.money = 500;
-  const { s } = S.place(sim, 'barricade', 30, 2, 0);
-  const cell = sim.nav.idx(30, 2);
+  const { s } = S.place(sim, 'barricade', 20, 0, 0);
+  const cell = sim.nav.idx(20, 0);
   assert.equal(sim.nav.structureAt(cell), s);
   assert.equal(sim.nav.cellCost(cell, { breaks: false }), Infinity, 'blocks non-breakers');
   assert.ok(sim.nav.cellCost(cell, { breaks: true }) > 5, 'costly for breakers');
@@ -49,16 +49,16 @@ test('power network: generator -> pole -> light, fuel, overload (Test F)', () =>
   st.money = 5000; st.inv.parts = 20; st.inv.planks = 20;
   const gen = st.structures.find((s) => s.id === 'gen_main');
   gen.fuel = 10;
+  for (const r of st.structures.filter((q) => q.type === 'solar')) r.charge = 0; // generator only
   sim.refreshPower();
   const yard = st.structures.find((s) => s.id === 'light_yard');
   assert.equal(yard.powered, true, 'yard light powered at night (auto)');
   assert.equal(sim.rt.housePowered, true);
   // far light is unpowered until a pole connects it
-  const { s: far } = S.place(sim, 'floodlight', 36, 30, 0);
+  const { s: far } = S.place(sim, 'floodlight', -56, -50, 0);
   sim.refreshPower();
   assert.equal(far.powered, false);
-  S.place(sim, 'pole', 24, 28, 0);
-  S.place(sim, 'pole', 22, 6, 0);
+  assert.ok(S.place(sim, 'pole', -40, -50, 0).s);
   sim.refreshPower();
   assert.equal(far.powered, true, 'pole chain carries power');
   // light level is higher under a powered floodlight
@@ -76,7 +76,7 @@ test('power network: generator -> pole -> light, fuel, overload (Test F)', () =>
   assert.equal(yard.powered, true);
   // overload: too many lights for one generator
   let placed = 0;
-  for (let x = -24; x < 10 && placed < 8; x += 2.5) for (const z of [-33, -36, -18]) { if (placed < 8 && S.place(sim, 'floodlight', x, z, 0).s) placed++; }
+  for (let x = -10; x < 26 && placed < 8; x += 2.5) for (const z of [-3, 11]) { if (placed < 8 && S.place(sim, 'floodlight', x, z, 0).s) placed++; }
   assert.equal(placed, 8);
   sim.refreshPower();
   assert.ok(sim.rt.networks.some((n) => n.overloaded));

@@ -1,6 +1,6 @@
 // The farm's fixed buildings, interiors and set dressing.
 import * as THREE from 'three';
-import { BUILDINGS, FIXTURES, ROAD } from '../data/layout.js';
+import { BUILDINGS, FIXTURES, ROAD, PROPS, COMPOUND } from '../data/layout.js';
 import { heightAt } from '../sim/terrain.js';
 import { worldUV, mergeList, bx, cy, mk, wallGeo, textTexture } from './build-helpers.js';
 import { addWind } from './materials.js';
@@ -13,7 +13,6 @@ export function buildEnvironment(scene, M) {
   buildFarmhouse(root, M, refs);
   buildBarn(root, M, refs);
   buildShed(root, M, refs);
-  buildSilo(root, M);
   buildProps(root, M, refs);
   return refs;
 }
@@ -335,84 +334,31 @@ function buildShed(root, M) {
   g.add(mk(worldUV(mergeList([bx(2.2, 0.04, 0.45, 1.0, 1.0, -D / 2 + 0.35), bx(2.2, 0.04, 0.45, 1.0, 1.6, -D / 2 + 0.35)]), 1), M.wood));
 }
 
-function buildSilo(root, M) {
-  const S = BUILDINGS.silo;
-  const g = new THREE.Group();
-  g.position.set(S.x, S.baseY, S.z);
-  root.add(g);
-  const body = new THREE.CylinderGeometry(S.r, S.r, S.h, 40, 1, true);
-  body.translate(0, S.h / 2, 0);
-  const uv = body.attributes.uv;
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 8, uv.getY(i) * 4);
-  const metalSide = M.metal.clone();
-  g.add(mk(body, metalSide));
-  g.add(mk(new THREE.SphereGeometry(S.r * 1.02, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.55, 1).translate(0, S.h, 0), M.steel));
-  g.add(mk(cy(S.r + 0.2, S.r + 0.3, 0.5, 32, 0, 0.1, 0), M.concrete));
-  // ladder
-  const lad = [];
-  lad.push(bx(0.05, S.h, 0.05, -0.25, S.h / 2, S.r + 0.25), bx(0.05, S.h, 0.05, 0.25, S.h / 2, S.r + 0.25));
-  for (let y = 0.5; y < S.h; y += 0.4) lad.push(bx(0.5, 0.03, 0.03, 0, y, S.r + 0.25));
-  g.add(mk(mergeList(lad), M.darkSteel));
-  g.rotation.y = -0.6;
-}
-
 // ---------------------------------------------------------------------------
 function buildProps(root, M, refs) {
   const at = (x, z) => heightAt(x, z);
-  // old pickup truck by the house
+  const H = BUILDINGS.farmhouse;
+  // ---- water system: tanks, pump house, pipes
+  const galv = new THREE.MeshStandardMaterial({ map: M.tex.metal.map, normalMap: M.tex.metal.normalMap, color: 0xb6bcc0, roughness: 0.45, metalness: 0.7 });
+  for (const t of PROPS.tanks) {
+    const y = at(t.x, t.z);
+    const body = new THREE.CylinderGeometry(t.r, t.r, t.h, 28, 1);
+    body.translate(t.x, y + t.h / 2, t.z);
+    const uv = body.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 6, uv.getY(i) * 2);
+    root.add(mk(body, galv));
+    root.add(mk(new THREE.ConeGeometry(t.r + 0.1, 0.6, 28).translate(t.x, y + t.h + 0.3, t.z), M.steel));
+    root.add(mk(cy(t.r + 0.25, t.r + 0.3, 0.25, 28, t.x, y + 0.1, t.z), M.concrete));
+  }
   {
-    const g = new THREE.Group();
-    g.position.set(-13.5, at(-13.5, 5.5), 5.5); g.rotation.y = 0.25;
-    const paint = new THREE.MeshStandardMaterial({ color: 0x4d6a7a, roughness: 0.55, metalness: 0.35 });
-    const rust = M.ironRust;
-    g.add(mk(mergeList([bx(1.9, 0.7, 2.0, 0, 0.95, 1.4), bx(1.85, 0.55, 1.4, 0, 1.55, 0.1)]), paint));
-    g.add(mk(mergeList([bx(1.9, 0.12, 2.2, 0, 0.7, -1.5), bx(0.08, 0.55, 2.2, -0.92, 1.0, -1.5), bx(0.08, 0.55, 2.2, 0.92, 1.0, -1.5), bx(1.9, 0.55, 0.08, 0, 1.0, -2.6)]), rust));
-    g.add(mk(mergeList([bx(1.7, 0.42, 0.04, 0, 1.6, 0.82, -0.25), bx(0.04, 0.4, 1.0, -0.94, 1.6, 0.1), bx(0.04, 0.4, 1.0, 0.94, 1.6, 0.1)]), M.glass));
-    g.add(mk(mergeList([bx(2.0, 0.2, 0.15, 0, 0.6, 2.45), bx(2.0, 0.15, 0.15, 0, 0.55, -2.65)]), M.steel));
-    for (const [x, z] of [[-0.95, 1.6], [0.95, 1.6], [-0.95, -1.5], [0.95, -1.5]]) g.add(mk(cy(0.38, 0.38, 0.28, 16, x, 0.38, z, 0, Math.PI / 2), M.rubber));
-    const hl = new THREE.MeshStandardMaterial({ color: 0xddddcc, roughness: 0.1, emissive: 0x000000 });
-    g.add(mk(mergeList([cy(0.12, 0.12, 0.05, 12, -0.65, 1.0, 2.42, Math.PI / 2), cy(0.12, 0.12, 0.05, 12, 0.65, 1.0, 2.42, Math.PI / 2)]), hl));
-    root.add(g);
+    const p = PROPS.pumpHouse, y = at(p.x, p.z);
+    root.add(mk(worldUV(bx(p.w, p.h, p.d, p.x, y + p.h / 2, p.z), 1.6), M.wood));
+    root.add(mk(worldUV(bx(p.w + 0.6, 0.08, p.d + 0.6, p.x, y + p.h + 0.15, p.z, 0.12), 1.5), M.metalRoof));
+    root.add(mk(bx(0.9, 1.8, 0.05, p.x, y + 0.9, p.z - p.d / 2 - 0.02), M.woodDark));
+    // pipe from the pond to the tanks
+    const pipe = [cy(0.09, 0.09, 8, 8, -26, at(-26, 30) + 0.35, 30, 0, Math.PI / 2), cy(0.09, 0.09, 7, 8, -23, at(-23, 34.5) + 0.35, 34.5, Math.PI / 2)];
+    root.add(mk(mergeList(pipe), M.steel));
   }
-  // rusted tractor beside the barn
-  {
-    const g = new THREE.Group();
-    g.position.set(12, at(12, -25), -25); g.rotation.y = 1.9;
-    const red = new THREE.MeshStandardMaterial({ color: 0x7a2a16, roughness: 0.7, metalness: 0.3 });
-    g.add(mk(mergeList([bx(0.9, 0.8, 2.4, 0, 1.2, 0.3), bx(1.2, 0.2, 1.0, 0, 1.6, -0.9)]), red));
-    g.add(mk(mergeList([cy(0.75, 0.75, 0.4, 18, -0.85, 0.75, -0.8, 0, Math.PI / 2), cy(0.75, 0.75, 0.4, 18, 0.85, 0.75, -0.8, 0, Math.PI / 2), cy(0.42, 0.42, 0.25, 14, -0.65, 0.42, 1.3, 0, Math.PI / 2), cy(0.42, 0.42, 0.25, 14, 0.65, 0.42, 1.3, 0, Math.PI / 2)]), M.rubber));
-    g.add(mk(mergeList([cy(0.06, 0.06, 1.0, 8, 0.3, 2.0, 1.0), bx(0.5, 0.06, 0.4, 0, 1.75, -0.6)]), M.darkSteel));
-    root.add(g);
-  }
-  // round hay bales
-  for (const [x, z, r] of [[33, -1, 0.2], [35, 1.2, 1.1], [31.8, 2.3, 0.6]]) {
-    root.add(mk(cy(0.75, 0.75, 1.2, 20, x, at(x, z) + 0.75, z, 0, Math.PI / 2).rotateY(r), M.hay));
-  }
-  // woodpile east of the house
-  {
-    const parts = [];
-    const x0 = BUILDINGS.farmhouse.x + BUILDINGS.farmhouse.w / 2 + 0.8, z0 = BUILDINGS.farmhouse.z - 1;
-    for (let r = 0; r < 4; r++) for (let i = 0; i < 7 - r; i++) parts.push(cy(0.11, 0.11, 0.9, 7, x0, 0.12 + r * 0.2, z0 - 0.7 + i * 0.22 + r * 0.1, Math.PI / 2));
-    const m = mk(mergeList(parts), M.bark);
-    m.position.y = at(x0, z0); root.add(m);
-  }
-  // clothesline with sheets (wind)
-  {
-    const x0 = -34, z0 = -14, x1 = -34, z1 = -4;
-    const y = at(x0, z0);
-    root.add(mk(mergeList([cy(0.05, 0.06, 2.2, 6, x0, y + 1.1, z0), cy(0.05, 0.06, 2.2, 6, x1, y + 1.1, z1), bx(0.06, 0.06, 1.2, x0, y + 2.1, z0, 0, Math.PI / 2), bx(0.06, 0.06, 1.2, x1, y + 2.1, z1, 0, Math.PI / 2)]), M.woodDark));
-    root.add(mk(cy(0.006, 0.006, 10, 3, x0, y + 2.1, (z0 + z1) / 2, Math.PI / 2), M.black, false));
-    const cloth = addWind(new THREE.MeshStandardMaterial({ color: 0xd8d3c4, roughness: 0.9, side: THREE.DoubleSide }), { strength: 1.5, heightScale: -1.2, instanced: false, flutter: 0.04 });
-    for (const [zz, w] of [[-12, 1.4], [-9.8, 1.2], [-7.2, 1.6]]) {
-      const geo = new THREE.PlaneGeometry(w, 1.1, 6, 6); geo.rotateY(Math.PI / 2);
-      geo.translate(0, -0.55, 0);
-      const m = mk(geo, cloth); m.position.set(x0, y + 2.08, zz); root.add(m);
-    }
-  }
-  // barrels by the shed
-  const barrel = new THREE.MeshStandardMaterial({ color: 0x3b4a3a, roughness: 0.6, metalness: 0.5 });
-  for (const [x, z] of [[-3.6, -27.5], [-3.6, -26.6], [-2.8, -27.1]]) root.add(mk(cy(0.3, 0.3, 0.9, 14, x, at(x, z) + 0.45, z), barrel));
-  // well pump & trough
+  // ---- pump at the pond & trough
   {
     const { x, z } = FIXTURES.well;
     const y = at(x, z);
@@ -423,19 +369,79 @@ function buildProps(root, M, refs) {
     const water = new THREE.MeshStandardMaterial({ color: 0x1f2b2a, roughness: 0.05, metalness: 0.1 });
     root.add(mk(bx(1.45, 0.02, 0.48, x + 0.2, y + 0.62, z + 1.05), water, false));
     root.add(mk(cy(0.16, 0.13, 0.3, 12, x - 0.9, y + 0.15, z + 0.4), M.steel));
+    // little dock into the pond
+    root.add(mk(worldUV(bx(1.4, 0.1, 4, -33.5, at(-33.5, 33) + 0.15, 33, 0, 0.4), 1.2), M.wood));
+  }
+  // ---- generator yard: gravel pad edging, spare concrete pads, fuel drums
+  for (const g of PROPS.genPads) root.add(mk(worldUV(bx(2.6, 0.18, 1.8, g.x, at(g.x, g.z) + 0.04, g.z), 1.3), M.concrete));
+  root.add(mk(worldUV(bx(2.6, 0.18, 1.8, 40, at(40, -46) + 0.02, -46), 1.3), M.concrete));
+  const drum = new THREE.MeshStandardMaterial({ color: 0x8a1a12, roughness: 0.5, metalness: 0.4 });
+  for (const [x, z] of [[56.5, -40], [57.3, -41], [56.6, -42]]) root.add(mk(cy(0.3, 0.3, 0.9, 14, x, at(x, z) + 0.45, z), drum));
+  // ---- storage yard: crates, barrels
+  for (const c of PROPS.crates) root.add(mk(worldUV(bx(c.w, 1.1, c.d, c.x, at(c.x, c.z) + 0.55, c.z), 0.9), M.wood));
+  root.add(mk(worldUV(bx(1.0, 0.9, 1.0, 41.4, at(41, 8) + 1.55, 8.1, 0, 0.3), 0.9), M.wood));
+  const barrel = new THREE.MeshStandardMaterial({ color: 0x31475a, roughness: 0.55, metalness: 0.5 });
+  for (const b of PROPS.barrels) root.add(mk(cy(0.32, 0.32, 0.92, 14, b.x, at(b.x, b.z) + 0.46, b.z), barrel));
+  // ---- old pickup by the house
+  {
+    const g = new THREE.Group();
+    const tx = H.x + 10, tz = H.z + 9;
+    g.position.set(tx, at(tx, tz), tz); g.rotation.y = 0.35;
+    const paint = new THREE.MeshStandardMaterial({ color: 0x4d6a7a, roughness: 0.55, metalness: 0.35 });
+    g.add(mk(mergeList([bx(1.9, 0.7, 2.0, 0, 0.95, 1.4), bx(1.85, 0.55, 1.4, 0, 1.55, 0.1)]), paint));
+    g.add(mk(mergeList([bx(1.9, 0.12, 2.2, 0, 0.7, -1.5), bx(0.08, 0.55, 2.2, -0.92, 1.0, -1.5), bx(0.08, 0.55, 2.2, 0.92, 1.0, -1.5), bx(1.9, 0.55, 0.08, 0, 1.0, -2.6)]), M.ironRust));
+    g.add(mk(mergeList([bx(1.7, 0.42, 0.04, 0, 1.6, 0.82, -0.25), bx(0.04, 0.4, 1.0, -0.94, 1.6, 0.1), bx(0.04, 0.4, 1.0, 0.94, 1.6, 0.1)]), M.glass));
+    g.add(mk(mergeList([bx(2.0, 0.2, 0.15, 0, 0.6, 2.45), bx(2.0, 0.15, 0.15, 0, 0.55, -2.65)]), M.steel));
+    for (const [x, z] of [[-0.95, 1.6], [0.95, 1.6], [-0.95, -1.5], [0.95, -1.5]]) g.add(mk(cy(0.38, 0.38, 0.28, 16, x, 0.38, z, 0, Math.PI / 2), M.rubber));
+    root.add(g);
+  }
+  // ---- rusted tractor by the barn
+  {
+    const g = new THREE.Group();
+    g.position.set(34, at(34, -18), -18); g.rotation.y = 2.4;
+    const red = new THREE.MeshStandardMaterial({ color: 0x7a2a16, roughness: 0.7, metalness: 0.3 });
+    g.add(mk(mergeList([bx(0.9, 0.8, 2.4, 0, 1.2, 0.3), bx(1.2, 0.2, 1.0, 0, 1.6, -0.9)]), red));
+    g.add(mk(mergeList([cy(0.75, 0.75, 0.4, 18, -0.85, 0.75, -0.8, 0, Math.PI / 2), cy(0.75, 0.75, 0.4, 18, 0.85, 0.75, -0.8, 0, Math.PI / 2), cy(0.42, 0.42, 0.25, 14, -0.65, 0.42, 1.3, 0, Math.PI / 2), cy(0.42, 0.42, 0.25, 14, 0.65, 0.42, 1.3, 0, Math.PI / 2)]), M.rubber));
+    g.add(mk(mergeList([cy(0.06, 0.06, 1.0, 8, 0.3, 2.0, 1.0), bx(0.5, 0.06, 0.4, 0, 1.75, -0.6)]), M.darkSteel));
+    root.add(g);
+  }
+  // round hay bales near the pen
+  for (const [x, z, r] of [[-27.5, -6, 0.2], [-26.8, -3.8, 1.1], [-25.4, -5.2, 0.6]]) root.add(mk(cy(0.75, 0.75, 1.2, 20, x, at(x, z) + 0.75, z, 0, Math.PI / 2).rotateY(r), M.hay));
+  // woodpile against the house
+  {
+    const parts = [];
+    const x0 = H.x + H.w / 2 + 0.8, z0 = H.z - 1;
+    for (let r = 0; r < 4; r++) for (let i = 0; i < 7 - r; i++) parts.push(cy(0.11, 0.11, 0.9, 7, x0, 0.12 + r * 0.2, z0 - 0.7 + i * 0.22 + r * 0.1, Math.PI / 2));
+    const m = mk(mergeList(parts), M.bark); m.position.y = at(x0, z0); root.add(m);
+  }
+  // clothesline west of the house
+  {
+    const x0 = H.x - 9, z0 = H.z - 4, z1 = H.z + 5;
+    const y = at(x0, z0);
+    root.add(mk(mergeList([cy(0.05, 0.06, 2.2, 6, x0, y + 1.1, z0), cy(0.05, 0.06, 2.2, 6, x0, y + 1.1, z1), bx(0.06, 0.06, 1.2, x0, y + 2.1, z0, 0, Math.PI / 2), bx(0.06, 0.06, 1.2, x0, y + 2.1, z1, 0, Math.PI / 2)]), M.woodDark));
+    root.add(mk(cy(0.006, 0.006, z1 - z0, 3, x0, y + 2.1, (z0 + z1) / 2, Math.PI / 2), M.black, false));
+    const cloth = addWind(new THREE.MeshStandardMaterial({ color: 0xd8d3c4, roughness: 0.9, side: THREE.DoubleSide }), { strength: 1.5, heightScale: -1.2, instanced: false, flutter: 0.04 });
+    for (const [zz, w] of [[z0 + 2, 1.4], [z0 + 4.2, 1.2], [z0 + 6.8, 1.6]]) {
+      const geo = new THREE.PlaneGeometry(w, 1.1, 6, 6); geo.rotateY(Math.PI / 2); geo.translate(0, -0.55, 0);
+      const m = mk(geo, cloth); m.position.set(x0, y + 2.08, zz); root.add(m);
+    }
+  }
+  // fire pit seating logs
+  for (const l of PROPS.logs) {
+    const m = mk(cy(0.22, 0.24, 1.8, 10, 0, 0, 0, 0, Math.PI / 2), M.bark);
+    m.position.set(l.x, at(l.x, l.z) + 0.22, l.z); m.rotation.y = -l.rot; root.add(m);
   }
   // shipping bin
   {
     const { x, z } = FIXTURES.shippingBin;
-    const y = at(x, z);
-    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = -0.3;
+    const g = new THREE.Group(); g.position.set(x, at(x, z), z); g.rotation.y = Math.PI / 2;
     g.add(mk(worldUV(bx(1.6, 0.9, 1.1, 0, 0.45, 0), 0.9), M.wood));
     g.add(mk(worldUV(bx(1.7, 0.08, 1.2, 0, 0.98, -0.05, -0.12), 0.9), M.woodDark));
     const sign = new THREE.MeshStandardMaterial({ map: textTexture(['SHIPPING'], { font: 'bold 80px Georgia' }), roughness: 0.9 });
-    g.add(mk(bx(1.0, 0.3, 0.02, 0, 0.55, 0.56), sign, false));
+    g.add(mk(bx(1.0, 0.3, 0.02, 0, 0.55, -0.56), sign, false));
     root.add(g);
   }
-  // mailbox with flag
+  // mailbox with flag, by the road
   {
     const { x, z } = FIXTURES.mailbox;
     const y = at(x, z);
@@ -446,45 +452,43 @@ function buildProps(root, M, refs) {
     root.add(flag);
     refs.mailFlag = flag;
   }
-  // farm sign at the driveway entrance
+  // farm sign over the gate posts
   {
-    const x = -2.5, z = 66;
-    const y = at(x, z);
+    const gx = COMPOUND.gate.x, gz = COMPOUND.z1, hw = COMPOUND.gate.width / 2 + 0.3;
+    const y = at(gx, gz);
     const sign = new THREE.MeshStandardMaterial({ map: textTexture(['HOLLOW ACRES'], { w: 1024, h: 200, bg: '#3a2e22', fg: '#d9cba8', font: 'bold 110px Georgia' }), roughness: 0.9 });
-    root.add(mk(mergeList([bx(0.18, 2.6, 0.18, x - 1.9, y + 1.3, z), bx(0.18, 2.6, 0.18, x + 1.9, y + 1.3, z)]), M.woodDark));
-    root.add(mk(bx(3.4, 0.6, 0.08, x, y + 2.1, z), sign));
+    root.add(mk(mergeList([bx(0.24, 3.6, 0.24, gx - hw, y + 1.8, gz), bx(0.24, 3.6, 0.24, gx + hw, y + 1.8, gz), bx(hw * 2 + 0.6, 0.2, 0.2, gx, y + 3.5, gz)]), M.woodDark));
+    root.add(mk(bx(4.2, 0.7, 0.08, gx, y + 3.0, gz + 0.15), sign));
     const rs = new THREE.MeshStandardMaterial({ map: textTexture(['CO RD 9'], { w: 256, h: 96, bg: '#1d5a2c', fg: '#e8e8e8', font: 'bold 54px Arial', weathered: false }), roughness: 0.5, metalness: 0.4 });
-    root.add(mk(cy(0.04, 0.04, 2.4, 6, 9, at(9, 68) + 1.2, 68), M.steel));
-    root.add(mk(bx(0.9, 0.32, 0.03, 9, at(9, 68) + 2.3, 68), rs));
+    const sx = gx + 7, sz = ROAD.county.z - 4.5;
+    root.add(mk(cy(0.04, 0.04, 2.4, 6, sx, at(sx, sz) + 1.2, sz), M.steel));
+    root.add(mk(bx(0.9, 0.32, 0.03, sx, at(sx, sz) + 2.3, sz), rs));
   }
-  // utility poles along the driveway with a line to the house
+  // utility line from the county road to the farmhouse
   {
-    const poles = [[5.5, 70], [4.5, 48], [3.5, 26], [-8, 2]];
-    const wood = M.woodDark;
+    const poles = PROPS.utilityPoles;
     const pts = [];
     for (const [x, z] of poles) {
       const y = at(x, z);
-      root.add(mk(mergeList([cy(0.13, 0.17, 9, 8, x, y + 4.5, z), bx(1.6, 0.12, 0.12, x, y + 8.4, z)]), wood));
+      root.add(mk(mergeList([cy(0.13, 0.17, 9, 8, x, y + 4.5, z), bx(1.6, 0.12, 0.12, x, y + 8.4, z)]), M.woodDark));
       pts.push(new THREE.Vector3(x - 0.6, y + 8.45, z), new THREE.Vector3(x + 0.6, y + 8.45, z));
     }
     const wire = [];
     const sag = (a, b) => { for (let i = 0; i < 12; i++) { const t0 = i / 12, t1 = (i + 1) / 12; const p0 = a.clone().lerp(b, t0); p0.y -= Math.sin(t0 * Math.PI) * 0.8; const p1 = a.clone().lerp(b, t1); p1.y -= Math.sin(t1 * Math.PI) * 0.8; wire.push(p0, p1); } };
     for (let i = 0; i < poles.length - 1; i++) { sag(pts[i * 2], pts[i * 2 + 2]); sag(pts[i * 2 + 1], pts[i * 2 + 3]); }
-    const H = BUILDINGS.farmhouse;
-    sag(pts[pts.length - 2], new THREE.Vector3(H.x + H.w / 2 - 0.2, H.baseY + H.floor + H.wallH - 0.2, H.z + 2));
-    const lg = new THREE.BufferGeometry().setFromPoints(wire);
-    root.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x111111 })));
+    sag(pts[pts.length - 2], new THREE.Vector3(H.x - H.w / 2 + 0.2, H.baseY + H.floor + H.wallH - 0.2, H.z + 2));
+    root.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(wire), new THREE.LineBasicMaterial({ color: 0x111111 })));
   }
   // road edge posts along the county road
   for (let x = -150; x <= 150; x += 18) {
     const z = ROAD.county.z - ROAD.county.width / 2 - 0.6;
-    if (Math.abs(x - 2) < 6) continue;
+    if (Math.abs(x - COMPOUND.gate.x) < 6) continue;
     root.add(mk(bx(0.1, 0.9, 0.1, x, at(x, z) + 0.45, z), M.white, false));
   }
-  // scattered tools & buckets near the field gate
-  root.add(mk(cy(0.16, 0.13, 0.3, 12, 13.5, at(13.5, 9) + 0.15, 9), M.steel));
+  // wheelbarrow & buckets by the crop walkway
+  root.add(mk(cy(0.16, 0.13, 0.3, 12, 2.6, at(2.6, -34) + 0.15, -34), M.steel));
   {
-    const g = new THREE.Group(); g.position.set(5.5, at(5.5, 8.5), 8.5); g.rotation.y = 1.2;
+    const g = new THREE.Group(); g.position.set(-18.5, at(-18.5, -31), -31); g.rotation.y = 1.2;
     g.add(mk(mergeList([bx(0.7, 0.3, 0.9, 0, 0.45, 0), bx(0.04, 0.04, 1.1, -0.3, 0.45, -0.9), bx(0.04, 0.04, 1.1, 0.3, 0.45, -0.9)]), M.paintGreen));
     g.add(mk(cy(0.2, 0.2, 0.08, 12, 0, 0.2, 0.45, 0, Math.PI / 2), M.rubber));
     root.add(g);

@@ -42,9 +42,27 @@ The build is one self-contained HTML file with no external assets or network cal
 
 All keys can be rebound in Settings → Controls. Mouse sensitivity, invert Y, FOV, head bob, reduced camera motion and reduced flashing are also there.
 
+## The farm
+
+The property is a fenced compound in a clearing in the woods (north is up on the map):
+
+| Area | Where | What it's for |
+|---|---|---|
+| Farmhouse | North-west | Home base: bed (sleep/save), laptop (shop, market, contracts, fields), security monitor, the first letters |
+| Crop area | North-centre | Four blocks split by walkways. You start with the home field; the other three are cleared and tilled as you level up |
+| Generator yard | North-east, fenced, gravel | Main generator, fuel shed, spare concrete pads for more generators |
+| Storage barn | East | Storage bins, workbench, crate yard and shipping bin out front |
+| Courtyard & fire pit | Centre | Paths meet here. The fire pit burns lumber for light all night without power |
+| Animal pen | West, fenced | Coop and laying hens: eggs every morning |
+| Water system | South-west, fenced | Pond, hand pump (fills the watering can), tanks, pump house |
+| Solar field | South-east, fenced | Four panel rows that charge by day and feed the grid at night. Two start wrecked |
+| Perimeter & main gate | All round / south | The first line of defence. The gate opens onto the driveway, county road and mailbox |
+
+There's a 25-30 m clearing between the fence and the treeline, so at night you can see things coming, and decide where to light, trap and barricade.
+
 ## The game
 
-**Day.** Six crops (wheat, potatoes, corn, tomatoes, strawberries, pumpkins), each with its own growth time, water needs, yield, price and regrowth. Plants only grow while watered. Rain waters for you, and sprinklers automate it. Market prices move each morning within ±25%, with one crop in demand each day. Contracts pay well above market. Farm level rises with lifetime earnings and unlocks crops, items and land. Three extra parcels add 123 plots, and more ground to defend. Tool upgrades (galvanized can, push seeder, sickle) let you work whole rows at once. Time pauses while you browse menus during the day, and sleeping skips to 6 PM.
+**Day.** Six crops (wheat, potatoes, corn, tomatoes, strawberries, pumpkins), each with its own growth time, water needs, yield, price and regrowth. Plants only grow while watered. Rain waters for you, and sprinklers automate it. Market prices move each morning within ±25%, with one crop in demand each day. Contracts pay well above market. Farm level rises with lifetime earnings and unlocks crops, items and more fields. Three extra crop blocks add 113 plots, and more crops to defend. Hens lay eggs every morning (collect them at the coop), and more can be bought. Tool upgrades (galvanized can, push seeder, sickle) let you work whole rows at once. Time pauses while you browse menus during the day, and sleeping skips to 6 PM.
 
 **Night.** Five creature types across three categories share one AI framework (navigation grid + A*, perception with sight cones, light and line of sight, hearing, memory). Each has its own brain:
 
@@ -58,9 +76,9 @@ All keys can be rebound in Settings → Controls. Mouse sensitivity, invert Y, F
 
 Nights escalate with days survived and with how much the farm has grown (the "tithe" owed). Rare nights change the rhythm (quiet nights, processions, hunger, blackouts). At first light everything retreats to the treeline.
 
-**Defense.** Barricades (upgradeable to reinforced), floodlights (upgradeable to halogen), power poles, generators, security cameras with motion alerts, leg-hold traps, scarecrows, sprinklers, radio decoys and iron chimes (unlocked by lore). Power is a real network: generators burn fuel in proportion to load, poles extend range, overloads trip the breaker, and a destroyed or empty generator darkens everything it feeds. Weapons are a shovel, revolver, shotgun (upgrade) and road flares.
+**Defense.** The perimeter fence (Gnawers chew through it, Drifters and the Antlered smash it, the Hollow drifts through) and a main gate you can close. Barricades (upgradeable to reinforced), floodlights (upgradeable to halogen), power poles, generators, security cameras with motion alerts, leg-hold traps, scarecrows, sprinklers, radio decoys and iron chimes (unlocked by lore). Power is a real network: generators burn fuel in proportion to load, solar rows charge by day (less under cloud) and drain at night, poles extend range, overloads trip the breaker, and a destroyed, empty or flat power source darkens everything it feeds. The fire pit is unpowered light the Hollow can't put out. Weapons are a shovel, revolver, shotgun (upgrade) and road flares.
 
-**Consequences.** Crops have health, and damaged crops yield less. Ruined plots must be cleared. Structures have HP, and a destroyed barricade or door becomes a real gap in navigation. Repairs cost lumber, spare parts and money, and restore actual function. If you fall at night, you wake at dawn with a medical bill while the farm takes the rest of the night's damage. A county relief parcel and capped bills keep recovery possible after a disaster.
+**Consequences.** Crops have health, hens can be taken from a broken coop, and damaged crops yield less. Ruined plots must be cleared. Structures have HP, and a destroyed barricade or door becomes a real gap in navigation. Repairs cost lumber, spare parts and money, and restore actual function. If you fall at night, you wake at dawn with a medical bill while the farm takes the rest of the night's damage. A county relief parcel and capped bills keep recovery possible after a disaster.
 
 **Mystery.** Nine documents (house, barn, a cabin, a chapel ruin, a dry well, a survey marker, the Tithe Stone, and letters that arrive by mail) reveal the 1891 covenant, the bestiary weaknesses and the way out: drive the four iron boundary stakes home, offer a pumpkin at the Tithe Stone, and survive the Last Harvest. Then the game continues in a calmer free-play mode.
 

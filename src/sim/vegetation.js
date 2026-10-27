@@ -74,17 +74,18 @@ export function getVegetation() {
   }
   // Composed shade trees and a windbreak near the house
   const feature = [
-    { x: -36, z: -1, kind: 'oak', scale: 1.5 }, { x: -33, z: -21, kind: 'oak', scale: 1.3 },
-    { x: -14, z: -35, kind: 'oak', scale: 1.2 }, { x: 40.5, z: 2, kind: 'oak', scale: 1.4 },
-    { x: 8, z: -38, kind: 'pine', scale: 1.2 }, { x: 14, z: -39.5, kind: 'pine', scale: 1.1 },
-    { x: 20, z: -38.5, kind: 'pine', scale: 1.25 }, { x: -28, z: 30, kind: 'oak', scale: 1.1 },
-    { x: 33, z: 33, kind: 'dead', scale: 1.1 },
+    { x: -52, z: -48, kind: 'oak', scale: 1.5 }, { x: -24, z: -52, kind: 'oak', scale: 1.2 },
+    { x: -52, z: -27, kind: 'oak', scale: 1.3 }, { x: -22, z: -18, kind: 'oak', scale: 1.1 },
+    { x: 14, z: 7, kind: 'oak', scale: 1.25 }, { x: 56, z: 15, kind: 'pine', scale: 1.2 },
+    { x: -55, z: 17, kind: 'pine', scale: 1.1 }, { x: 28, z: -20, kind: 'dead', scale: 1.0 },
+    { x: -12, z: 50, kind: 'oak', scale: 1.2 },
   ];
   for (const f of feature) trees.push({ ...f, rot: f.x * 1.3, r: (f.kind === 'pine' ? 0.32 : 0.45) * f.scale, collide: true });
   // Scattered bushes along fences and buildings
   const B = BUILDINGS;
   bushes.push({ x: B.farmhouse.x + 6.6, z: B.farmhouse.z - 2, scale: 1.1, rot: 1 });
   bushes.push({ x: B.farmhouse.x - 6.8, z: B.farmhouse.z + 3, scale: 0.9, rot: 2 });
+  for (const [x, z] of [[-7, 9], [6, 11], [-30, -33], [-51, -38], [38, 14], [-14, 18], [-57, 0], [57, -10], [-26, -48]]) bushes.push({ x, z, scale: 0.9 + ((x * 7 + z * 3) & 3) * 0.15, rot: x });
   cache = { trees, rocks, bushes };
   return cache;
 }

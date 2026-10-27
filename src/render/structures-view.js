@@ -27,6 +27,23 @@ export function makeCone(length, radius) {
   return m;
 }
 
+let solarMat = null, solarBroken = null;
+function solarMaterials() {
+  if (solarMat) return [solarMat, solarBroken];
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#0d1a33'; g.fillRect(0, 0, 256, 64);
+  for (let x = 0; x < 16; x++) for (let y = 0; y < 4; y++) {
+    g.fillStyle = `rgb(${18 + (x * 7 + y * 3) % 10},${34 + (x * 5) % 12},${70 + (y * 9) % 16})`;
+    g.fillRect(x * 16 + 1, y * 16 + 1, 14, 14);
+  }
+  g.fillStyle = '#9aa4ad'; for (let x = 0; x <= 256; x += 64) g.fillRect(x - 1, 0, 2, 64);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.repeat.set(8, 1); t.anisotropy = 8;
+  solarMat = new THREE.MeshStandardMaterial({ map: t, roughness: 0.18, metalness: 0.35, envMapIntensity: 1.4 });
+  solarBroken = new THREE.MeshStandardMaterial({ map: t, color: 0x6a6a6a, roughness: 0.6, metalness: 0.2 });
+  return [solarMat, solarBroken];
+}
+
 // Build the mesh group for a structure type. Returns { group, parts }.
 export function buildStructureMesh(type, M, level = 0, s = {}) {
   const g = new THREE.Group();
@@ -166,6 +183,74 @@ export function buildStructureMesh(type, M, level = 0, s = {}) {
       }
       break;
     }
+    case 'gate': {
+      const len = s.len || 6;
+      parts.leaves = [];
+      for (const sgn of [-1, 1]) {
+        const pivot = new THREE.Group();
+        pivot.position.set(sgn * len / 2, 0, 0);
+        const w = len / 2 - 0.08, dir = -sgn;
+        const leaf = new THREE.Group();
+        leaf.add(mk(mergeList([bx(w, 0.12, 0.07, dir * w / 2, 0.35, 0), bx(w, 0.12, 0.07, dir * w / 2, 0.85, 0), bx(w, 0.12, 0.07, dir * w / 2, 1.35, 0),
+          bx(0.1, 1.3, 0.08, dir * 0.08, 0.85, 0), bx(0.1, 1.3, 0.08, dir * (w - 0.05), 0.85, 0),
+          bx(Math.hypot(w, 1.0), 0.1, 0.06, dir * w / 2, 0.85, 0.02, 0, 0, dir * Math.atan2(1.0, w))]), M.wood));
+        pivot.add(leaf);
+        pivot.userData.sgn = sgn;
+        g.add(pivot);
+        parts.leaves.push(pivot);
+      }
+      break;
+    }
+    case 'coop': {
+      const W = 4, D = 3, Hh = 2.0;
+      parts.body = new THREE.Group();
+      parts.body.add(mk(worldUV(bx(W, Hh, D, 0, Hh / 2 + 0.3, 0), 1.6), M.wood));
+      for (const [x, z] of [[-W / 2 + 0.1, -D / 2 + 0.1], [W / 2 - 0.1, -D / 2 + 0.1], [-W / 2 + 0.1, D / 2 - 0.1], [W / 2 - 0.1, D / 2 - 0.1]]) parts.body.add(mk(bx(0.14, 0.4, 0.14, x, 0.2, z), M.woodDark));
+      parts.roof = mk(worldUV(bx(W + 0.5, 0.08, D + 0.6, 0, Hh + 0.55, 0, 0.18), 1.5), M.metalRoof);
+      parts.body.add(parts.roof);
+      parts.body.add(mk(bx(0.6, 0.7, 0.05, 0.6, 0.75, D / 2 + 0.03), M.black, false));
+      parts.body.add(mk(worldUV(bx(0.6, 0.05, 1.6, 0.6, 0.35, D / 2 + 0.7, -0.35), 1), M.woodDark));
+      parts.body.add(mk(bx(1.2, 0.5, 0.6, -1.0, 1.0, D / 2 + 0.3), M.wood));
+      g.add(parts.body);
+      break;
+    }
+    case 'solar': {
+      const len = s.len || 34, dep = 3.2;
+      const [ok, broken] = solarMaterials();
+      parts.panels = [];
+      const n = Math.round(len / 4.25);
+      const seg = len / n;
+      for (let i = 0; i < n; i++) {
+        const x = -len / 2 + seg * (i + 0.5);
+        g.add(mk(mergeList([bx(0.1, 1.1, 0.1, x, 0.55, -dep / 2 + 0.3), bx(0.1, 2.0, 0.1, x, 1.0, dep / 2 - 0.3), bx(0.08, 0.08, dep, x, 1.2, 0, 0.45)]), M.steel));
+        const p = mk(bx(seg - 0.08, 0.05, dep, 0, 0, 0), ok);
+        p.position.set(x, 1.35, 0);
+        p.rotation.x = 0.45; // tilted toward the southern sun
+        p.userData.base = { x, y: 1.35, rx: 0.45 };
+        g.add(p);
+        parts.panels.push(p);
+      }
+      parts.inverter = mk(bx(0.6, 0.8, 0.35, -len / 2 - 0.6, 0.5, 0), M.white);
+      const led = new THREE.MeshBasicMaterial({ color: 0x113311 });
+      g.add(parts.inverter, mk(bx(0.08, 0.08, 0.02, -len / 2 - 0.6, 0.75, 0.18), led, false, false));
+      parts.led = led;
+      parts.matOk = ok; parts.matBroken = broken;
+      break;
+    }
+    case 'firepit': {
+      const stones = [];
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const st = new THREE.DodecahedronGeometry(0.2 + (i % 3) * 0.04, 0); st.translate(Math.cos(a) * 0.85, 0.12, Math.sin(a) * 0.85);
+        stones.push(st);
+      }
+      g.add(mk(mergeList(stones), M.stone));
+      g.add(mk(mergeList([cy(0.08, 0.1, 1.1, 6, 0, 0.15, 0, 0, 1.4), cy(0.08, 0.1, 1.0, 6, 0, 0.18, 0, 1.4, 0.3)]), M.woodDark));
+      const ember = new THREE.MeshStandardMaterial({ color: 0x1a1008, emissive: 0xff5a10, emissiveIntensity: 0, roughness: 1 });
+      g.add(mk(new THREE.CircleGeometry(0.6, 14).rotateX(-Math.PI / 2).translate(0, 0.05, 0), ember, false));
+      parts.ember = ember;
+      break;
+    }
     case 'pump': default: break;
   }
   return { group: g, parts };
@@ -185,6 +270,7 @@ export class StructuresView {
   sync(sim) {
     const seen = new Set();
     for (const s of sim.state.structures) {
+      if (s.type === 'fence') continue;
       seen.add(s.id);
       let it = this.items.get(s.id);
       if (it && (it.level !== s.level)) { this.remove(s.id); it = null; }
@@ -192,6 +278,44 @@ export class StructuresView {
       this.applyState(it, s, sim);
     }
     for (const id of [...this.items.keys()]) if (!seen.has(id)) this.remove(id);
+    this.rebuildFences(sim);
+  }
+
+  // All fence segments share two instanced meshes (posts, rails).
+  rebuildFences(sim) {
+    const fences = sim.state.structures.filter((s) => s.type === 'fence');
+    if (!this.fencePosts) {
+      const cap = fences.length + 64;
+      this.fencePosts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.14, 1.3, 0.14).translate(0, 0.55, 0), this.M.woodDark, cap * 2);
+      const railGeo = worldUV(new THREE.BoxGeometry(1, 0.12, 0.05), 1.4);
+      this.fenceRails = new THREE.InstancedMesh(railGeo, this.M.wood, cap * 3);
+      for (const m of [this.fencePosts, this.fenceRails]) { m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; this.root.add(m); }
+    }
+    const M4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+    let np = 0, nr = 0;
+    for (const f of fences) {
+      const len = f.len || 3.5, r = f.hp / f.maxHp, dead = f.hp <= 0;
+      const c = Math.cos(f.rot), sn = Math.sin(f.rot);
+      const at = (lx, lz) => [f.x + lx * c + lz * sn, f.z - lx * sn + lz * c];
+      for (const side of [-1, 1]) {
+        const [x, z] = at(side * len / 2, 0);
+        q.setFromEuler(e.set(0, f.rot, dead ? side * 0.5 : 0));
+        p.set(x, heightAt(x, z) - (dead ? 0.4 : 0), z); sc.set(1, 1, 1);
+        this.fencePosts.setMatrixAt(np++, M4.compose(p, q, sc));
+      }
+      [0.35, 0.7, 1.05].forEach((y, i) => {
+        if (dead && i > 0) return;
+        if (!dead && ((r < 0.35 && i !== 0) || (r < 0.7 && i === 2))) return;
+        const [x, z] = at(0, 0.06);
+        const g = heightAt(x, z);
+        q.setFromEuler(e.set(dead ? 1.4 : 0, f.rot, !dead && r < 0.7 ? (i % 2 ? 0.08 : -0.06) * (1 - r) * 2 : dead ? 0.15 : 0));
+        p.set(x, g + (dead ? 0.06 : y), z); sc.set(len + 0.1, 1, 1);
+        this.fenceRails.setMatrixAt(nr++, M4.compose(p, q, sc));
+      });
+    }
+    this.fencePosts.count = np; this.fenceRails.count = nr;
+    this.fencePosts.instanceMatrix.needsUpdate = true; this.fenceRails.instanceMatrix.needsUpdate = true;
+    this.fenceDirty = false;
   }
 
   add(s) {
@@ -248,6 +372,19 @@ export class StructuresView {
     if (s.type === 'trap' && p.jaws) {
       p.jaws.forEach((j, i) => { j.rotation.x = s.armed ? 0 : (i ? -1.45 : 1.45); });
     }
+    if (s.type === 'gate') { it.gateOpen = s.open || destroyed; it.gateBroken = destroyed; }
+    if (s.type === 'coop' && p.body) { p.body.rotation.z = destroyed ? 0.35 : 0; p.roof.visible = !destroyed; p.body.position.y = destroyed ? -0.3 : 0; }
+    if (s.type === 'solar' && p.panels) {
+      p.panels.forEach((m, i) => {
+        const b = m.userData.base;
+        const wrecked = destroyed && (i % 3 !== 1);
+        m.material = destroyed ? p.matBroken : p.matOk;
+        m.rotation.set(wrecked ? b.rx + 0.6 * ((i % 2) ? 1 : -0.7) : b.rx, 0, wrecked ? 0.25 * ((i % 2) ? 1 : -1) : 0);
+        m.position.y = wrecked ? b.y - 0.6 : b.y;
+        m.visible = !(destroyed && i % 4 === 2);
+      });
+    }
+    if (s.type === 'firepit' && p.ember) it.lit = !!s.lit;
     if (s.type === 'scarecrow') g.rotation.z = destroyed ? 1.45 : (r < 0.5 ? 0.25 : 0);
     if (s.type === 'chimes') g.rotation.z = destroyed ? 1.3 : 0;
     if (s.type === 'door') {
@@ -280,6 +417,13 @@ export class StructuresView {
       }
       if (s.type === 'camera' && p.led) p.led.color.setHex(it.powered && Math.sin(time * 3 + it.phase) > 0 ? 0xff2010 : 0x220000);
       if (s.type === 'decoy' && p.dial) p.dial.emissiveIntensity = s.activeUntil > sim.clockSeconds ? 2 + Math.sin(time * 8) : 0;
+      if (s.type === 'gate' && p.leaves) for (const l of p.leaves) {
+        const want = it.gateOpen ? (l.userData.sgn < 0 ? 1.45 : -1.45) : 0;
+        l.rotation.y += (want - l.rotation.y) * Math.min(1, dt * 2.5);
+        l.rotation.z = it.gateBroken ? 0.2 * l.userData.sgn : 0;
+      }
+      if (s.type === 'solar' && p.led) p.led.color.setHex(s.hp <= 0 ? 0x220000 : (s.charge || 0) > 0.05 ? (Math.sin(time * 2) > 0 ? 0x33ff55 : 0x0b330f) : 0x553300);
+      if (s.type === 'firepit' && p.ember) p.ember.emissiveIntensity = it.lit ? 2.5 + Math.sin(time * 9) * 0.6 + Math.sin(time * 23) * 0.3 : 0;
       if (s.type === 'chimes' && p.tubes) p.tubes.forEach((t, i) => { t.rotation.z = Math.sin(time * (1.3 + i * 0.2) + i) * 0.12 * (0.5 + U.uWind.value); });
       if (s.type === 'door') {
         if (s.building === 'farmhouse' && this.env.houseDoor) {
@@ -308,6 +452,7 @@ export class StructuresView {
       if (s.type === 'floodlight') return new THREE.Vector3(s.x, y + 4.7, s.z);
       if (s.type === 'camera') return new THREE.Vector3(s.x, y + 3.2, s.z);
       if (s.type === 'house') return new THREE.Vector3(s.x + 6, y + 3.6, s.z - 2);
+      if (s.type === 'solar') return new THREE.Vector3(s.x - (s.len || 34) / 2 - 0.6, y + 0.9, s.z);
       return new THREE.Vector3(s.x, y + 2, s.z);
     };
     const sag = (a, b) => {
@@ -321,7 +466,7 @@ export class StructuresView {
       }
     };
     for (const net of sim.rt.networks || []) {
-      const nodes = net.nodes.filter((n) => n.hp > 0 || n.type === 'generator');
+      const nodes = net.nodes.filter((n) => n.hp > 0 || n.type === 'generator' || n.type === 'solar');
       // spanning tree: connect each node to nearest earlier node
       for (let i = 1; i < nodes.length; i++) {
         let best = null, bd = Infinity;

@@ -12,8 +12,8 @@ const DIFF = { easy: 0.65, normal: 1.0, hard: 1.4 };
 export function nightBudget(state) {
   const day = state.time.day;
   const stakes = Object.values(state.lore.stakes || {}).filter(Boolean).length;
-  const growth = state.earned / 1000 + (state.owned.parcels.length - 1) * 1.5;
-  let b = 1 + day * 1.15 + growth * 1.0;
+  const growth = state.earned / 1500 + (state.owned.parcels.length - 1) * 1.2;
+  let b = 1 + day * 1.0 + growth * 1.0;
   b *= DIFF[state.difficulty] ?? 1;
   b *= 1 - stakes * 0.09;
   if (state.lore.rite === 'done') b *= 0.35;

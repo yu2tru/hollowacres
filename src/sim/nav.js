@@ -116,8 +116,8 @@ export class NavGrid {
     const s = this.structureAt(i);
     if (s && s.blocksNav && s.hp > 0 && !s.open) {
       if (agent.incorporeal) return 1;
-      if (!agent.breaks || !s.breakable) return Infinity;
-      return 6 + s.hp / 12;
+      if (!agent.breaks || !s.breakable || (agent.breakOnly && !agent.breakOnly.includes(s.type))) return Infinity;
+      return 3 + s.hp / 30;
     }
     return 1 + (this.dense[i] ? 0.4 : 0) + (agent.extraCost ? agent.extraCost(i) : 0);
   }
@@ -184,7 +184,7 @@ export class NavGrid {
           visit[ni] = stamp; g[ni] = ng; came[ni] = cur;
           const hh = h(ni);
           if (hh < bestH) { bestH = hh; best = ni; }
-          heap.push(ni, ng + hh * 1.3);
+          heap.push(ni, ng + hh * 1.5);
         }
       }
     }

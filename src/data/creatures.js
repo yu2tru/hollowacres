@@ -9,10 +9,10 @@ export const CREATURES = {
     lightFear: 0.42,        // won't enter light above this unless starving
     cropDamage: 0.045,      // plot health per second while feeding
     appetite: 1.6,          // plot-healths eaten before it is full and leaves
-    attack: { damage: 9, range: 1.6, interval: 1.1 },
-    breaks: false, trapEffect: 'kill',
+    breaks: true, breakOnly: ['fence', 'coop'], trapEffect: 'kill',
+    attack: { damage: 9, range: 1.6, interval: 1.1, structDamage: 9 },
     desc: 'Hairless, long-jawed things that run in packs and eat what you grow.',
-    lore: 'Feeds on crops, preferring potatoes and pumpkins. Each one takes its fill and goes back to the trees. Skittish alone, bold in numbers. Avoids bright light and scarecrows unless the pack is large or starving. A trap kills one outright.',
+    lore: 'Feeds on crops, preferring potatoes and pumpkins. Each one takes its fill and goes back to the trees. Skittish alone, bold in numbers. Avoids bright light and scarecrows unless the pack is large or starving. Chews through wooden fences and into dark chicken coops. A trap kills one outright.',
   },
   drifter: {
     id: 'drifter', name: 'Drifter', category: 'Humanoid', brain: 'drifter',

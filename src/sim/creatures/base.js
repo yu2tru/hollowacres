@@ -4,7 +4,7 @@ import { CREATURES } from '../../data/creatures.js';
 import { WORLD } from '../../data/layout.js';
 import { heightAt } from '../terrain.js';
 import { wrapAngle, moveTowardsAngle, clamp } from '../../core/math.js';
-import { damageStructure } from '../structures.js';
+import { damageStructure, approachPoint } from '../structures.js';
 
 let SEQ = 1;
 
@@ -39,6 +39,7 @@ export class Creature {
     this.anim = { phase: 0, attack: 0, hurt: 0, stun: 0, mode: 'walk' };
     this.incorporeal = !!this.def.incorporeal;
     this.breaks = !!this.def.breaks;
+    this.breakOnly = this.def.breakOnly || null;
     this.radius = this.def.radius;
     this.seenByPlayer = false;
     this.unseenT = 0;
@@ -91,7 +92,7 @@ export class Creature {
     if (!this.incorporeal && this.breaks) {
       const ax = this.x + (dx / len) * 0.45, az = this.z + (dz / len) * 0.45;
       const hit = this.sim.world.overlapsCircle(ax, az, this.radius * 0.85, this.y + 0.3, this.y + 1.6,
-        (c) => c.tag === 'structure' && c.ref && c.ref.breakable && c.ref.hp > 0 && !c.ref.open);
+        (c) => c.tag === 'structure' && c.ref && c.ref.breakable && c.ref.hp > 0 && !c.ref.open && (!this.breakOnly || this.breakOnly.includes(c.ref.type)));
       if (hit) { this.breakTarget = hit.ref; this.speed = 0; return; }
     }
     const step = Math.min(len, speed * dt);
@@ -131,7 +132,8 @@ export class Creature {
     const s = this.breakTarget;
     if (!s) return false;
     if (s.hp <= 0 || s.open) { this.breakTarget = null; this.path = null; return false; }
-    if (Math.hypot(s.x - this.x, s.z - this.z) > 6) { this.breakTarget = null; return false; }
+    const ap = approachPoint(s, this.x, this.z, 0);
+    if (Math.hypot(ap.x - this.x, ap.z - this.z) > ap.r + this.radius + 3) { this.breakTarget = null; return false; }
     this.yaw = moveTowardsAngle(this.yaw, Math.atan2(s.x - this.x, s.z - this.z), dt * 4);
     this.speed = 0;
     this.attackCd -= dt;

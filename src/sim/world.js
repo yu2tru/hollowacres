@@ -1,7 +1,7 @@
 // Physical world for the simulation: colliders, floors, ray casts.
 // Colliders are 2D footprints (circle or oriented box) extruded over a y range.
 import { heightAt, isInPond } from './terrain.js';
-import { BUILDINGS, WORLD, LANDMARKS } from '../data/layout.js';
+import { BUILDINGS, WORLD, LANDMARKS, FURNITURE, PROPS } from '../data/layout.js';
 
 const CELL = 8;
 
@@ -279,24 +279,23 @@ export function buildStaticWorld(world) {
   shed.baseY = sb;
   addWallsWithDoor(shed, sb, 'shed');
 
-  const silo = BUILDINGS.silo;
-  silo.baseY = heightAt(silo.x, silo.z);
-  world.add({ kind: 'circle', x: silo.x, z: silo.z, r: silo.r }, { y0: silo.baseY - 1, y1: silo.baseY + silo.h, tag: 'silo' });
-
-  // interior furniture colliders (bed, desk, table) - low obstacles
-  const furn = [
-    { x: -26.2, z: -12.8, hw: 1.0, hd: 1.15, h: 0.7 },  // bed
-    { x: -16.8, z: -13.5, hw: 1.2, hd: 0.45, h: 0.8 },  // desk
-    { x: -22.5, z: -9.0, hw: 0.8, hd: 0.55, h: 0.8 },   // table
-    { x: -27.4, z: -7.4, hw: 0.3, hd: 0.6, h: 0.9 },    // drawer
-    { x: 22, z: -20.5, hw: 2.2, hd: 0.6, h: 1.0 },      // crates in barn
-    { x: 27.5, z: -19.5, hw: 1.3, hd: 0.5, h: 0.95 },   // workbench
-    { x: 26.5, z: -6.5, hw: 2.4, hd: 0.7, h: 1.2 },     // storage bins
-  ];
-  for (const f of furn) {
-    const g = heightAt(f.x, f.z) + (f.x < -15 ? fh.floor : 0);
-    world.add({ kind: 'box', x: f.x, z: f.z, hw: f.hw, hd: f.hd, rot: 0 }, { y0: g - 0.5, y1: g + f.h, tag: 'furniture', opaque: false });
+  // interior furniture colliders - low obstacles
+  for (const f of FURNITURE) {
+    const b = BUILDINGS[f.b];
+    const g = b.baseY + (b.floor || 0);
+    world.add({ kind: 'box', x: b.x + f.x, z: b.z + f.z, hw: f.hw, hd: f.hd, rot: 0 }, { y0: g - 0.5, y1: g + f.h, tag: 'furniture', opaque: false });
   }
+  // yard props
+  for (const t of PROPS.tanks) {
+    const g = heightAt(t.x, t.z);
+    world.add({ kind: 'circle', x: t.x, z: t.z, r: t.r }, { y0: g - 1, y1: g + t.h, tag: 'prop' });
+  }
+  { const p = PROPS.pumpHouse, g = heightAt(p.x, p.z);
+    world.add({ kind: 'box', x: p.x, z: p.z, hw: p.w / 2, hd: p.d / 2, rot: 0 }, { y0: g - 1, y1: g + p.h, tag: 'prop' }); }
+  for (const c of PROPS.crates) { const g = heightAt(c.x, c.z); world.add({ kind: 'box', x: c.x, z: c.z, hw: c.w / 2, hd: c.d / 2, rot: 0 }, { y0: g - 1, y1: g + 1.2, tag: 'prop', opaque: false }); }
+  for (const r of PROPS.barrels) { const g = heightAt(r.x, r.z); world.add({ kind: 'circle', x: r.x, z: r.z, r: 0.33 }, { y0: g - 1, y1: g + 0.95, tag: 'prop', opaque: false }); }
+  for (const [x, z] of PROPS.utilityPoles) world.add({ kind: 'circle', x, z, r: 0.2 }, { y0: -5, y1: heightAt(x, z) + 9, tag: 'prop', opaque: false });
+  for (const l of PROPS.logs) { const g = heightAt(l.x, l.z); world.add({ kind: 'box', x: l.x, z: l.z, hw: 0.9, hd: 0.22, rot: l.rot }, { y0: g - 1, y1: g + 0.45, tag: 'prop', opaque: false }); }
   addLandmarkColliders(world);
   return { houseDoor: houseDoors.south, barnDoor: barnDoors.west };
 }

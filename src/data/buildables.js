@@ -71,5 +71,9 @@ export const BUILD_ORDER = ['barricade', 'floodlight', 'pole', 'generator', 'cam
 export const FIXED_STRUCTURES = {
   door: { name: 'Door', hp: 120, repairMat: 'planks', breakable: true },
   pump: { name: 'Well pump', hp: 80, repairMat: 'parts' },
-  fence: { name: 'Fence', hp: 70, repairMat: 'planks', breakable: true, blocks: true, w: 3.5, d: 0.25, h: 1.2 },
+  fence: { name: 'Fence', hp: 70, repairMat: 'planks', breakable: true, blocks: true, w: 3.5, d: 0.25, h: 1.2, cost: 20, repairQty: 2 },
+  gate: { name: 'Main gate', hp: 180, repairMat: 'planks', breakable: true, blocks: true, w: 6, d: 0.3, h: 1.6, cost: 120 },
+  coop: { name: 'Chicken coop', hp: 180, repairMat: 'planks', breakable: true, blocks: true, w: 4, d: 3, h: 2.2, cost: 120 },
+  solar: { name: 'Solar panel row', hp: 120, repairMat: 'parts', blocks: true, w: 34, d: 3.2, h: 2.2, cost: 260, capacity: 2, store: 8 },
+  firepit: { name: 'Fire pit', hp: 999, blocks: true, w: 1.8, d: 1.8, h: 0.5, light: { radius: 9, intensity: 0.85 } },
 };

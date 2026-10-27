@@ -19,6 +19,7 @@ import { Vegetation } from './vegetation-view.js';
 import { CropsView } from './crops-view.js';
 import { StructuresView, Ghost } from './structures-view.js';
 import { CreaturesView } from './creatures-view.js';
+import { AnimalsView } from './animals-view.js';
 import { ViewModel } from './viewmodel.js';
 import { FX } from './fx.js';
 import { WeatherView } from './weather-view.js';
@@ -85,6 +86,7 @@ export class Renderer {
     this.structs = new StructuresView(this.scene, this.M, this.env);
     this.ghost = new Ghost(this.scene, this.M);
     this.creatures = new CreaturesView(this.scene);
+    this.animals = new AnimalsView(this.scene);
     this.fx = new FX(this.scene, g.effects);
     this.weather = new WeatherView(this.scene, g.effects);
     this.lights = new LightPool(this.scene, g.shadows);
@@ -214,7 +216,10 @@ export class Renderer {
     });
     E.on('structureAdded', () => { this.structs.sync(sim); });
     E.on('structureRemoved', () => { this.structs.sync(sim); });
-    E.on('structureChanged', (s) => { const it = this.structs.items.get(s.id); if (it) this.structs.applyState(it, s, sim); });
+    E.on('structureChanged', (s) => {
+      if (s.type === 'fence') { this.structs.fenceDirty = true; return; }
+      const it = this.structs.items.get(s.id); if (it) this.structs.applyState(it, s, sim);
+    });
     E.on('powerUpdated', () => { this.structs.sync(sim); this.structs.rebuildWires(sim); });
     E.on('seedChanged', (id) => this.vm.setSeed(id));
   }
@@ -298,8 +303,15 @@ export class Renderer {
     // world views
     this.veg.update(focus);
     this.crops.update();
+    if (this.structs.fenceDirty) this.structs.rebuildFences(sim);
     this.structs.update(dt, sim, this.time, env.night);
     this.creatures.update(sim, dt, { night: env.night > 0.5, cctv: this.mode === 'cctv' });
+    this.animals.update(sim, dt, this.time);
+    for (const f of st.structures) if (f.type === 'firepit' && f.lit) {
+      const y = heightAt(f.x, f.z);
+      if (Math.random() < dt * 40) this.fx.emit('fire', f.x, y + 0.2, f.z, { n: 1 });
+      if (Math.random() < dt * 5) this.fx.emit('smoke', f.x, y + 1.0, f.z, { n: 1, wind: U.uWind.value });
+    }
     // flares fx
     const fl = new Set();
     for (const f of sim.rt.flares) { const id = `${f.x.toFixed(2)},${f.z.toFixed(2)}`; fl.add(id); if (!this.fx.flares.has(id)) this.fx.addFlare(id, f.x, f.z); }

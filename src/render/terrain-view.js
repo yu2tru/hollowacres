@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { heightAt, distToDriveway } from '../sim/terrain.js';
 import { forestDensity } from '../sim/vegetation.js';
-import { FIELDS, PLOT_PITCH, ROAD, BUILDINGS, POND, LANDMARKS, FIXTURES } from '../data/layout.js';
+import { FIELDS, PLOT_PITCH, ROAD, BUILDINGS, POND, LANDMARKS, FIXTURES, PEN, FIREPIT, COMPOUND } from '../data/layout.js';
 import { U } from './materials.js';
 import { fbmTile } from './textures.js';
 
@@ -30,14 +30,21 @@ function paintMask(size) {
   for (const p of ROAD.paths) {
     ctx.beginPath(); p.forEach((q, i) => (i ? ctx.lineTo(X(q.x), Z(q.z)) : ctx.moveTo(X(q.x), Z(q.z)))); ctx.stroke();
   }
-  // packed dirt around buildings and the yard
+  // packed dirt around buildings, courtyard and work yards
   const blob = (x, z, r, a = 0.7) => {
     const g = ctx.createRadialGradient(X(x), Z(z), 0, X(x), Z(z), r * s);
     g.addColorStop(0, `rgba(255,0,0,${a})`); g.addColorStop(1, 'rgba(255,0,0,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(X(x), Z(z), r * s, 0, Math.PI * 2); ctx.fill();
   };
-  blob(2, -6, 16, 0.55); blob(BUILDINGS.barn.x - 8, BUILDINGS.barn.z, 9, 0.8); blob(-7, -24, 7, 0.8);
-  blob(FIXTURES.well.x, FIXTURES.well.z, 3.5, 0.6);
+  const rect = (x0, z0, x1, z1, col) => { ctx.fillStyle = col; ctx.fillRect(X(x0), Z(z0), (x1 - x0) * s, (z1 - z0) * s); };
+  const H = BUILDINGS.farmhouse, Bn = BUILDINGS.barn;
+  blob(FIREPIT.x, FIREPIT.z, 12, 0.8);
+  blob(H.x - 1, H.z + 8, 7, 0.6);
+  blob(Bn.x - Bn.w / 2 - 5, Bn.z, 8, 0.8);
+  rect(36, 4.5, 54, 13, 'rgba(255,0,0,0.65)');
+  rect(PEN.x0, PEN.z0, PEN.x1, PEN.z1, 'rgba(255,0,0,0.35)');
+  blob(PEN.coop.x, PEN.coop.z + 2, 5, 0.6);
+  rect(3, 21, 59, 56, 'rgba(255,0,0,0.42)');
   for (const l of LANDMARKS) blob(l.x, l.z, l.r * 0.8, 0.45);
   // G: gravel - county road and driveway (with tire track dirt)
   ctx.strokeStyle = 'rgb(0,255,0)';
@@ -45,6 +52,10 @@ function paintMask(size) {
   ctx.beginPath(); ctx.moveTo(0, Z(ROAD.county.z)); ctx.lineTo(size, Z(ROAD.county.z)); ctx.stroke();
   ctx.lineWidth = ROAD.drivewayWidth * s;
   ctx.beginPath(); ROAD.driveway.forEach((q, i) => (i ? ctx.lineTo(X(q.x), Z(q.z)) : ctx.moveTo(X(q.x), Z(q.z)))); ctx.stroke();
+  // stone path from the porch, gravel generator yard
+  ctx.lineWidth = 2.2 * s;
+  ctx.beginPath(); ROAD.paths[0].forEach((q, i) => (i ? ctx.lineTo(X(q.x), Z(q.z)) : ctx.moveTo(X(q.x), Z(q.z)))); ctx.stroke();
+  ctx.fillStyle = 'rgba(0,255,0,0.85)'; ctx.fillRect(X(31.5), Z(-56.5), 28 * s, 31 * s);
   // B: mud - around pump, pond edge, low spots
   const mud = (x, z, r, a) => {
     const g = ctx.createRadialGradient(X(x), Z(z), 0, X(x), Z(z), r * s);
@@ -53,8 +64,8 @@ function paintMask(size) {
   };
   mud(FIXTURES.well.x, FIXTURES.well.z, 2.6, 0.9);
   mud(POND.x, POND.z, POND.r + 4, 1);
-  mud(BUILDINGS.barn.x - 7.5, BUILDINGS.barn.z, 4, 0.6);
-  mud(1, 12, 3, 0.5); mud(-3, 28, 4, 0.4);
+  mud(BUILDINGS.barn.x - BUILDINGS.barn.w / 2 - 3, BUILDINGS.barn.z, 4, 0.6);
+  mud(COMPOUND.gate.x, COMPOUND.z1 - 2, 3.5, 0.6); mud(PEN.coop.x + 2, PEN.coop.z + 3, 3, 0.5);
   ctx.filter = 'none';
   ctx.globalCompositeOperation = 'source-over';
   // tire tracks on the driveway (dirt ruts)
@@ -86,6 +97,7 @@ function paintMask(size) {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.NoColorSpace;
   tex.premultiplyAlpha = false;
+  tex.flipY = false; // canvas row 0 is world -z; shader samples with v = (z + half) / size
   tex.generateMipmaps = true;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   return tex;

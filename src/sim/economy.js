@@ -31,7 +31,7 @@ export function rollMarket(state, rng) {
     state.market.prices[id] = Math.round(next * 100) / 100;
   }
   const lvl = farmLevel(state).level;
-  const avail = CROP_IDS.filter((id) => CROPS[id].level <= lvl + 1);
+  const avail = CROP_IDS.filter((id) => CROPS[id].level <= lvl + 1 || id === 'egg');
   state.market.hot = rng.pick(avail);
   state.market.day = state.time.day;
 }
@@ -85,6 +85,13 @@ export function buySupply(sim, id, count = 1) {
   if (def.level && farmLevel(state).level < def.level) return `Requires farm level ${def.level}`;
   const cost = def.cost * count;
   if (state.money < cost) return 'Not enough money';
+  if (id === 'chicken') {
+    if (state.animals.chickens + count > 12) return 'The coop holds 12 hens';
+    state.money -= cost;
+    state.animals.chickens += count;
+    sim.events.emit('purchase', { id, cost });
+    return null;
+  }
   state.money -= cost;
   state.inv[id] = (state.inv[id] || 0) + (def.qty || 1) * count;
   sim.events.emit('purchase', { id, cost });

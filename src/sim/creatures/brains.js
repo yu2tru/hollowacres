@@ -3,7 +3,8 @@
 import { CROPS } from '../../data/crops.js';
 import { BUILDINGS, WORLD } from '../../data/layout.js';
 import { damagePlot, plotOwned } from '../farming.js';
-import { damageStructure, displayName, lightProps, generatorRunning } from '../structures.js';
+import { takeChicken } from '../animals.js';
+import { damageStructure, displayName, lightProps, generatorRunning, approachPoint } from '../structures.js';
 import { wrapAngle, clamp } from '../../core/math.js';
 
 const away = (c, fromX, fromZ, dist) => {
@@ -18,8 +19,8 @@ export const gnawerBrain = {
   pickPlot(c) {
     const sim = c.sim, st = sim.state;
     const pack = c.pack;
-    const starving = pack && pack.hunger > 160;
     const bold = pack && pack.alive() >= 3;
+    const starving = pack && pack.hunger > 160 && bold; // only a big pack is desperate enough to brave the light
     const scarecrows = st.structures.filter((s) => s.type === 'scarecrow' && s.hp > 0);
     let best = null, bestScore = 0;
     for (const p of st.plots) {
@@ -32,6 +33,13 @@ export const gnawerBrain = {
       const d = Math.hypot(p.x - c.x, p.z - c.z);
       const score = appeal / (1 + d / 40) * (lit > 0.3 ? 0.4 : 1) * (0.8 + Math.random() * 0.4);
       if (score > bestScore) { bestScore = score; best = p; }
+    }
+    // a dark coop full of hens is worth more than most fields
+    const coop = st.structures.find((s) => s.type === 'coop');
+    if (coop && st.animals.chickens > 0 && (sim.lightAt(coop.x, coop.z) <= c.def.lightFear || starving)) {
+      const d = Math.hypot(coop.x - c.x, coop.z - c.z);
+      const score = 1.5 * Math.min(1, st.animals.chickens / 3) / (1 + d / 40) * (0.8 + Math.random() * 0.4);
+      if (score > bestScore) return { coop };
     }
     // A bold pack tears down the scarecrow guarding the richest field
     if (!best && bold && scarecrows.length) {
@@ -46,6 +54,8 @@ export const gnawerBrain = {
     // full: it has taken its share and goes back to the trees
     if ((c.eaten || 0) >= c.def.appetite) { if (c.targetPlot) c.targetPlot.claimedBy = null; c.retreat(dt); return; }
     if (c.pack) c.pack.hunger += dt;
+    // a small pack that can't find a dark meal gives up and goes home
+    if (c.pack && c.pack.hunger > 200 && c.pack.alive() < 3 && !c.targetPlot && !c.targetCoop) { c.retreat(dt); return; }
     const sees = c.seesPlayer();
     const pd = c.distToPlayer();
     const bold = c.pack && c.pack.alive() >= 3 && c.hp > c.def.hp * 0.6;
@@ -66,6 +76,7 @@ export const gnawerBrain = {
           const pick = this.pickPlot(c);
           c.targetPlot = pick?.plot || null;
           c.targetScarecrow = pick?.scarecrow || null;
+          c.targetCoop = pick?.coop || null;
           if (c.targetPlot) c.targetPlot.claimedBy = c.id;
           c.stateT = 0;
           if (!pick) { // nothing to eat: circle the farm edge
@@ -77,6 +88,20 @@ export const gnawerBrain = {
             c.moveTo(c.wander.x, c.wander.z, c.def.speed, dt, 2);
             return;
           }
+        }
+        if (c.targetCoop) {
+          const k = c.targetCoop;
+          if (sim.state.animals.chickens <= 0) { c.targetCoop = null; c.stateT = 99; return; }
+          if (c.moveTo(k.x, k.z + (k.hp > 0 ? 2.0 : 0), c.def.runSpeed * 0.7, dt, 1.2) <= 1.3) {
+            c.attackCd -= dt;
+            if (c.attackCd <= 0) {
+              c.attackCd = k.hp > 0 ? 1 : 3;
+              c.anim.attack = 1;
+              if (k.hp > 0) damageStructure(sim, k, 5, c);
+              else if (takeChicken(sim, c)) { c.eaten = (c.eaten || 0) + c.def.appetite; if (c.pack) c.pack.hunger = 0; }
+            }
+          }
+          return;
         }
         if (c.targetScarecrow) {
           const s = c.targetScarecrow;
@@ -205,8 +230,9 @@ export const drifterBrain = {
           c.moveTo(h.x + 4, h.z + 9, c.def.speed, dt, 3);
           return;
         }
-        const reach = t.type === 'generator' ? 1.6 : t.type === 'door' ? 1.0 : 1.2;
-        if (c.moveTo(t.x, t.z, c.def.speed, dt, reach + c.radius) <= reach + c.radius + 0.1) c.attackStructure(t, dt);
+        const ap = approachPoint(t, c.x, c.z, 0.7);
+        const reach = ap.r + c.radius;
+        if (c.moveTo(ap.x, ap.z, c.def.speed, dt, reach) <= reach + 0.15) c.attackStructure(t, dt);
       }
     }
   },
@@ -231,6 +257,8 @@ export const antleredBrain = {
       else if (s.type === 'barricade') w = 0.6;
       else if (s.type === 'fence') w = 0.45;
       else if (s.type === 'pole') w = 0.5;
+      else if (s.type === 'solar') w = 0.9;
+      else if (s.type === 'gate') w = 0.7;
       else if (s.type === 'pump') w = 0.35;
       if (!w) continue;
       const d = Math.hypot(s.x - c.x, s.z - c.z);
@@ -284,8 +312,8 @@ export const antleredBrain = {
           if (s && s.hp > 0) { damageStructure(sim, s, c.def.attack.structDamage, c); sim.events.emit('sfx', { id: 'crash', x: nx, z: nz }); }
           else if (blockedStatic && c.chargeDist < 32) sim.events.emit('sfx', { id: 'crash', x: nx, z: nz });
           // also damage the target if we stopped next to it
-          const t = c.chargeTarget;
-          if (t && t !== s && t.hp > 0 && Math.hypot(t.x - c.x, t.z - c.z) < c.radius + 2.2) damageStructure(sim, t, c.def.attack.structDamage, c);
+          const t = c.target, ct = c.chargeTarget;
+          if (t && t !== s && t.hp > 0 && ct && Math.hypot(ct.x - c.x, ct.z - c.z) < c.radius + 2.2) damageStructure(sim, t, c.def.attack.structDamage, c);
           c.stunUntil = c.now + 2.4;
           c.hitPlayer = false;
           sim.emitNoise(c.x, c.z, 40, 'crash');
@@ -304,17 +332,19 @@ export const antleredBrain = {
         if (!c.target || c.target.hp <= 0 || c.stateT > 45) { c.target = this.pickTarget(c); c.stateT = 0; }
         const t = huntPlayer ? p : c.target;
         if (!t) { c.moveTo(0, 0, c.def.speed, dt, 8); return; }
-        const d = Math.hypot(t.x - c.x, t.z - c.z);
-        const lineClear = d < 26 && d > 5 && sim.nav.sightLine(c.x, c.z, t.x, t.z) > 0.5;
+        const aim = huntPlayer ? t : approachPoint(t, c.x, c.z, 0);
+        const d = Math.hypot(aim.x - c.x, aim.z - c.z);
+        const lineClear = d < 26 && d > 5 && sim.nav.sightLine(c.x, c.z, aim.x, aim.z) > 0.5;
         if (lineClear && (c.chargeCd || 0) <= c.now) {
-          c.chargeTarget = { x: t.x, z: t.z };
+          c.chargeTarget = { x: aim.x, z: aim.z };
           c.chargeCd = c.now + 6;
           c.setState('windup');
           sim.events.emit('sfx', { id: 'antler_snort', x: c.x, z: c.z });
           return;
         }
         if (huntPlayer) { c.moveTo(p.x, p.z, c.def.speed * 1.4, dt, c.def.attack.range); c.tryAttackPlayer(dt); return; }
-        if (c.moveTo(t.x, t.z, c.def.speed, dt, c.radius + 1.4) <= c.radius + 1.5) c.attackStructure(t, dt);
+        const ap = huntPlayer ? { x: t.x, z: t.z, r: 1.4 } : approachPoint(t, c.x, c.z, 1.2);
+        if (c.moveTo(ap.x, ap.z, c.def.speed, dt, ap.r + c.radius) <= ap.r + c.radius + 0.15) c.attackStructure(t, dt);
       }
     }
   },

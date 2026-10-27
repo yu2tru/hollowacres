@@ -1,7 +1,7 @@
 // Plot beds and crop plants (instanced per crop & stage). Plants visibly
 // grow through stages; damage tints & flattens them; ruined plots show debris.
 import * as THREE from 'three';
-import { CROPS } from '../data/crops.js';
+import { CROPS, PLANTABLE } from '../data/crops.js';
 import { PLOT_SIZE } from '../data/layout.js';
 import { heightAt } from '../sim/terrain.js';
 import { plotOwned } from '../sim/farming.js';
@@ -115,7 +115,7 @@ export class CropsView {
     this.root.add(this.beds);
     // plant meshes per crop/stage
     this.meshes = {};
-    for (const id of Object.keys(CROPS)) {
+    for (const id of PLANTABLE) {
       const per = LAYOUT[id] * LAYOUT[id];
       for (let st = 1; st <= 4; st++) {
         const m = new THREE.InstancedMesh(plantGeo(id, st), M.plant, plots.length * per);

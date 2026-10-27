@@ -1,11 +1,11 @@
 // Serializable game state. Everything that must survive save/load lives here.
 // Runtime-only data (colliders, AI, nav) is rebuilt from this on load.
-import { FIELDS, PLOT_PITCH, PARCELS, PREPLACED, fieldAFence, PLAYER_SPAWN } from '../data/layout.js';
+import { FIELDS, PLOT_PITCH, PARCELS, PREPLACED, fenceSegments, PLAYER_SPAWN } from '../data/layout.js';
 import { BUILDABLES, FIXED_STRUCTURES } from '../data/buildables.js';
 import { CROP_IDS } from '../data/crops.js';
 import { heightAt } from './terrain.js';
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export function makePlots() {
   const plots = [];
@@ -36,6 +36,11 @@ export function makeStructure(type, x, z, rot, extra = {}) {
   if (type === 'door') { s.building = extra.building; s.open = false; }
   if (type === 'camera') { s.name = extra.name || ''; }
   if (type === 'decoy') { s.activeUntil = 0; }
+  if (type === 'gate') { s.open = false; }
+  if (type === 'solar') { s.charge = 4; }
+  if (type === 'firepit') { s.lit = false; }
+  if (extra.len) s.len = extra.len;
+  if (extra.broken) s.hp = 0;
   if (extra.fixed) s.fixed = true;
   return s;
 }
@@ -47,12 +52,11 @@ export function createNewState(opts = {}) {
     const s = makeStructure(p.type, p.x ?? 0, p.z ?? 0, p.rot, { ...p, fixed: true });
     structures.push(s);
   }
-  for (const f of fieldAFence()) {
-    const s = makeStructure('fence', f.x, f.z, f.rot, { fixed: true });
-    s.id = `fence_${structures.length}`;
-    if (f.len) s.len = f.len;
+  fenceSegments().forEach((f, i) => {
+    const s = makeStructure('fence', f.x, f.z, f.rot, { fixed: true, len: f.len });
+    s.id = `fence_${i}`;
     structures.push(s);
-  }
+  });
   const prices = {};
   for (const id of CROP_IDS) prices[id] = 1;
 
@@ -73,6 +77,7 @@ export function createNewState(opts = {}) {
       fuel: 1, planks: 8, parts: 2, ammo38: 12, shells: 0, flares: 2, batteries: 1, medkit: 1, fertilizer: 0,
     },
     barn: { produce: {} },
+    animals: { chickens: 6, eggs: 0 },
     owned: { revolver: true, parcels: ['core'] },
     money: 220,
     earned: 0,
@@ -94,10 +99,11 @@ export function migrateState(data) {
   if (!data || typeof data !== 'object') throw new Error('Save data is empty or not an object');
   if (typeof data.version !== 'number') throw new Error('Save data has no version');
   if (data.version > SAVE_VERSION) throw new Error(`Save was made by a newer version (${data.version})`);
+  if (data.version < 4) throw new Error('This save is from an older version of the farm layout and can\'t be loaded. Please start a new farm.');
   const fresh = createNewState({ seed: data.seed });
   // shallow-merge defaults for any missing keys (forward compatible additions)
   const out = { ...fresh, ...data };
-  for (const k of ['time', 'weather', 'player', 'inv', 'barn', 'owned', 'market', 'lore', 'tutorial', 'night', 'stats', 'flags']) {
+  for (const k of ['time', 'weather', 'player', 'inv', 'barn', 'animals', 'owned', 'market', 'lore', 'tutorial', 'night', 'stats', 'flags']) {
     out[k] = { ...fresh[k], ...(data[k] || {}) };
   }
   out.inv.seeds = { ...(data.inv?.seeds || {}) };

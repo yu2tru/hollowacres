@@ -7,6 +7,8 @@ import { eyePos, viewDir, currentTool, harvestAction, worldRayDist } from './pla
 import * as farming from './farming.js';
 import { displayName, needsRepair, repairCost, defOf, tankSize } from './structures.js';
 import { totalProduce } from './economy.js';
+import { collectEggs } from './animals.js';
+import { FIXED_STRUCTURES } from '../data/buildables.js';
 
 const REACH = 2.9;
 
@@ -14,7 +16,7 @@ function fixtureY(name, f) {
   const fh = BUILDINGS.farmhouse;
   const house = ['bed', 'desk', 'monitor', 'table', 'drawer'].includes(name);
   const base = house ? fh.baseY + fh.floor : heightAt(f.x, f.z);
-  const off = { bed: 0.55, desk: 0.95, monitor: 1.15, table: 0.9, drawer: 0.95, shippingBin: 0.7, mailbox: 1.1, storage: 0.9, workbench: 1.0, ledgerCrate: 0.8 }[name] ?? 0.9;
+  const off = { coop: 0.8, bed: 0.55, desk: 0.95, monitor: 1.15, table: 0.9, drawer: 0.95, shippingBin: 0.7, mailbox: 1.1, storage: 0.9, workbench: 1.0, ledgerCrate: 0.8 }[name] ?? 0.9;
   return base + off;
 }
 
@@ -29,16 +31,29 @@ export function interactables(sim) {
     const lz = stake ? l.z - 0.9 : l.z;
     out.push({ kind: 'landmark', id: l.id, x: l.x, y: heightAt(l.x, lz) + (stake ? 1.05 : 1.0), z: lz, r: stake ? 0.5 : 0.9 });
   }
+  const pl = sim.state.player;
   for (const s of sim.state.structures) {
     const def = defOf(s);
     let y = heightAt(s.x, s.z), r = 0.7;
+    // long structures: interact at the point along them nearest the player
+    let sx = s.x, sz = s.z;
+    const half = (s.len || def.w || 0) / 2;
+    if (half > 2.2 && s.type !== 'door') {
+      const c = Math.cos(s.rot || 0), sn = Math.sin(s.rot || 0);
+      const lx = Math.max(-half, Math.min(half, (pl.x - s.x) * c - (pl.z - s.z) * sn));
+      sx = s.x + lx * c; sz = s.z - lx * sn;
+      y = heightAt(sx, sz);
+    }
     if (s.type === 'door') { y = BUILDINGS[s.building].baseY + (BUILDINGS[s.building].floor || 0) + 1.2; r = s.building === 'barn' ? 2.0 : 0.8; }
     else if (s.type === 'floodlight' || s.type === 'pole') { y += 1.4; r = 0.55; }
     else if (s.type === 'camera') { y += 1.6; r = 0.5; }
     else if (s.type === 'trap' || s.type === 'sprinkler' || s.type === 'decoy') { y += 0.25; r = 0.6; }
-    else if (s.type === 'barricade' || s.type === 'fence') { y += 0.8; r = (s.len || def.w) / 2; }
+    else if (s.type === 'barricade' || s.type === 'fence' || s.type === 'gate') { y += 0.8; r = Math.min(1.7, (s.len || def.w) / 2); }
+    else if (s.type === 'solar') { y += 1.3; r = 1.8; }
+    else if (s.type === 'firepit') { y += 0.3; r = 0.9; }
+    else if (s.type === 'coop') { y += 1.2; r = 1.6; }
     else y += (def.h || 1) * 0.6;
-    out.push({ kind: 'structure', id: s.id, ref: s, x: s.x, y, z: s.z, r });
+    out.push({ kind: 'structure', id: s.id, ref: s, x: sx, y, z: sz, r });
   }
   return out;
 }
@@ -124,6 +139,7 @@ function describe(sim, c) {
       case 'storage': f.title = 'Barn storage'; f.lines = [`${totalProduce(st.barn.produce)} / ${sim.barnCapacity()} stored`]; f.e = 'Open storage'; break;
       case 'workbench': f.title = 'Workbench'; f.lines = ['Property status & repairs']; f.e = 'Inspect property'; break;
       case 'ledgerCrate': f.title = 'Old ledger'; f.e = 'Read'; break;
+      case 'coop': f.title = 'Nesting boxes'; f.lines = [`${st.animals.chickens} hens · ${st.animals.eggs || 0} eggs waiting`]; f.e = st.animals.eggs ? 'Collect eggs' : null; break;
     }
     return f;
   }
@@ -165,7 +181,13 @@ function describe(sim, c) {
   if (s.type === 'camera') f.lines.push(s.powered ? `${s.name} · online` : `${s.name} · no power`);
   if (s.type === 'generator') f.lines.push(`Fuel ${s.fuel.toFixed(1)} / ${tankSize(st)} L · ${s.mode.toUpperCase()}`);
   if (s.type === 'trap') f.lines.push(s.armed ? 'Armed' : 'Sprung');
-  if (s.type === 'door') f.e = s.hp <= 0 ? null : s.open ? 'Close' : 'Open';
+  if (s.type === 'solar' && s.hp > 0) f.lines.push(`Battery ${Math.round(((s.charge || 0) / FIXED_STRUCTURES.solar.store) * 100)}% · feeds the grid 7 PM - 6:30 AM`);
+  if (s.type === 'solar' && s.hp <= 0) f.lines.push('Wrecked - repair with the hammer (6) and spare parts');
+  if (s.type === 'firepit') f.lines.push(s.lit ? 'Burning until dawn. Gnawers keep away. The Hollow can\'t put it out.' : 'Light it to keep the courtyard lit all night without power.');
+  if (s.type === 'coop') f.lines.push(`${st.animals.chickens} hens roost here at night`);
+  if (s.type === 'door' || s.type === 'gate') f.e = s.hp <= 0 ? null : s.open ? 'Close' : 'Open';
+  else if (s.type === 'firepit') f.e = s.lit ? null : 'Light fire (2 lumber)';
+  else if (s.type === 'solar' || s.type === 'coop') f.e = null;
   else if (s.type === 'pump') { f.title = 'Well pump'; f.e = s.hp > 0 ? 'Refill watering can' : null; f.lines.push(`Can: ${st.player.water}/${st.owned.can2 ? 24 : 12}`); }
   else if (s.type === 'trap' && !s.armed) f.e = 'Rearm (1 spare part)';
   else if (s.type === 'decoy') f.e = s.activeUntil > sim.clockSeconds ? null : 'Switch on broadcast';
@@ -202,6 +224,7 @@ export function doInteract(sim, f) {
       case 'storage': sim.openUI('storage'); return;
       case 'workbench': sim.openUI('property'); return;
       case 'ledgerCrate': sim.discover('ledger'); return;
+      case 'coop': { const e = collectEggs(sim); if (e) sim.notify(e, 'info'); return; }
     }
     return;
   }
@@ -220,11 +243,19 @@ export function doInteract(sim, f) {
   const s = f.ref;
   if (!s) return;
   switch (s.type) {
-    case 'door':
+    case 'firepit':
+      if (s.lit) return;
+      if ((st.inv.planks || 0) < 2) { sim.notify('Need 2 lumber to build a fire', 'warn'); return; }
+      st.inv.planks -= 2; s.lit = true;
+      sim.events.emit('sfx', { id: 'fire_light', x: s.x, z: s.z });
+      sim.events.emit('structureChanged', s);
+      return;
+    case 'solar': case 'coop': return;
+    case 'gate': case 'door':
       if (s.hp <= 0) return;
       s.open = !s.open;
       sim.syncStructure(s);
-      sim.events.emit('sfx', { id: s.open ? 'door_open' : 'door_close', x: s.x, z: s.z, big: s.building === 'barn' });
+      sim.events.emit('sfx', { id: s.open ? 'door_open' : 'door_close', x: s.x, z: s.z, big: s.building === 'barn' || s.type === 'gate' });
       sim.events.emit('structureChanged', s);
       return;
     case 'pump': {

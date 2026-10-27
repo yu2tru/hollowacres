@@ -3,7 +3,7 @@
 // journal, bestiary, map, stats), camera monitor, documents and reports.
 import { h, clear, keyName } from './dom.js';
 import { fmtMoney, fmtTime } from '../core/math.js';
-import { CROPS, CROP_IDS } from '../data/crops.js';
+import { CROPS, CROP_IDS, PLANTABLE } from '../data/crops.js';
 import { SUPPLIES, UPGRADES, FARM_LEVELS } from '../data/items.js';
 import { BUILDABLES } from '../data/buildables.js';
 import { CREATURES, CREATURE_IDS } from '../data/creatures.js';
@@ -72,7 +72,7 @@ export class Panels {
       const lv = econ.farmLevel(st).level;
       let body;
       if (state.tab === 'supply') {
-        const seedCards = CROP_IDS.map((id) => {
+        const seedCards = PLANTABLE.map((id) => {
           const c = CROPS[id];
           const locked = c.level > lv;
           return h(`div.card${locked ? '.locked' : ''}`, {},
@@ -86,7 +86,7 @@ export class Panels {
           const have = st.inv[d.id] || 0;
           return h(`div.card${locked ? '.locked' : ''}`, {},
             h('div.nm', {}, d.name, h('span.pr', {}, `$${d.cost}`)), h('div.ds', {}, d.desc),
-            h('div.ds.muted', {}, locked ? `Unlocks at farm level ${d.level}` : `In stock at home: ${have}`),
+            h('div.ds.muted', {}, locked ? `Unlocks at farm level ${d.level}` : d.id === 'chicken' ? `Hens: ${st.animals.chickens} / 12` : `In stock at home: ${have}`),
             h('div.row', {}, [1, 5].map((n) => h('button.btn', { disabled: locked || !open || st.money < d.cost * n, onclick: () => this.act(() => econ.buySupply(sim, d.id, n)) }, `Buy ${n}`))));
         });
         const upCards = Object.values(UPGRADES).map((d) => {
@@ -115,6 +115,7 @@ export class Panels {
         });
         body = [h('div.ds.muted', {}, 'Prices move each morning within ±25% of normal. The starred crop sells for 35% more today. Carried produce is sold at the shipping bin; barn stock can be sold here.'),
           h('table.t', { style: { marginTop: '10px' } }, h('tr', {}, h('th', {}, 'Produce'), h('th', {}, 'Today'), h('th', {}, 'Owned'), h('th', {}, '')), rows)];
+        body.push(h('div.ds.muted', { style: { marginTop: '8px' } }, `Hens: ${st.animals.chickens} · eggs waiting at the coop: ${st.animals.eggs || 0}`));
       } else if (state.tab === 'contracts') {
         const list = st.contracts.map((c) => {
           const have = econ.contractHave(st, c);
@@ -131,8 +132,8 @@ export class Panels {
           const locked = (p.minLevel || 1) > lv;
           return h(`div.card${locked ? '.locked' : ''}`, {}, h('div.nm', {}, p.name, h('span.pr', {}, owned ? 'Owned' : fmtMoney(p.cost))), h('div.ds', {}, p.desc),
             locked ? h('div.ds.muted', {}, `Requires farm level ${p.minLevel}`) : null,
-            h('div.ds.muted', {}, 'More land means more income - and more ground to defend at night.'),
-            h('div.row', {}, h('button.btn', { disabled: owned || locked || st.money < p.cost, onclick: () => this.act(() => econ.buyParcel(sim, p.id)) }, owned ? 'Owned' : 'Purchase')));
+            h('div.ds.muted', {}, 'More fields mean more income - and more crops to defend at night.'),
+            h('div.row', {}, h('button.btn', { disabled: owned || locked || st.money < p.cost, onclick: () => this.act(() => econ.buyParcel(sim, p.id)) }, owned ? 'Owned' : 'Clear & till')));
         }));
       } else {
         const w = st.weather;
@@ -142,7 +143,7 @@ export class Panels {
           h('div.ds', {}, `Expected next (around ${fmtTime(w.changeAt)}): ${nxt.name}.`),
           h('div.ds.muted', {}, 'Fog cuts how far you can see - and how far they can. Storms bring rain and lightning. Rain waters crops for free.'))];
       }
-      return this.panelFrame('Laptop', open ? 'Hollis Feed & Supply · open' : 'Feed & Supply closed', [['supply', 'Supply'], ['market', 'Market'], ['contracts', `Contracts (${st.contracts.length})`], ['land', 'Land'], ['forecast', 'Forecast']], state, render, body);
+      return this.panelFrame('Laptop', open ? 'Hollis Feed & Supply · open' : 'Feed & Supply closed', [['supply', 'Supply'], ['market', 'Market'], ['contracts', `Contracts (${st.contracts.length})`], ['land', 'Fields'], ['forecast', 'Forecast']], state, render, body);
     }, { tab });
   }
 
@@ -242,7 +243,7 @@ export class Panels {
     const seeds = Object.entries(st.inv.seeds).filter(([, v]) => v > 0);
     const produce = Object.entries(st.inv.produce).filter(([, v]) => v > 0);
     const barn = Object.entries(st.barn.produce).filter(([, v]) => v > 0);
-    const sup = Object.values(SUPPLIES).map((d) => [d.name.replace(/ \(.+\)/, ''), st.inv[d.id] || 0]);
+    const sup = Object.values(SUPPLIES).map((d) => [d.name.replace(/ \(.+\)/, ''), d.id === 'chicken' ? st.animals.chickens : st.inv[d.id] || 0]);
     const tools = [['Shovel', true], ['Revolver', st.owned.revolver], ['Shotgun', st.owned.shotgun], ...Object.values(UPGRADES).filter((u) => u.id !== 'shotgun').map((u) => [u.name, st.owned[u.id]])];
     return [
       h('div.grid', {},
@@ -338,10 +339,18 @@ export class Panels {
     for (const b of Object.values(BUILDINGS)) {
       if (b.r) { ctx.beginPath(); ctx.arc(X(b.x), Z(b.z), b.r * sc, 0, Math.PI * 2); ctx.fill(); } else ctx.fillRect(X(b.x - b.w / 2), Z(b.z - b.d / 2), b.w * sc, b.d * sc);
     }
+    // fences (broken ones in red) and long structures
+    for (const s of st.structures) {
+      if (s.type !== 'fence' && s.type !== 'gate' && s.type !== 'solar') continue;
+      const len = s.len || 3.5, c = Math.cos(s.rot), sn = Math.sin(s.rot);
+      ctx.strokeStyle = s.hp <= 0 ? '#d0533a' : s.type === 'solar' ? '#4a6fb0' : s.type === 'gate' ? (s.open ? '#8fb36a' : '#c9a46a') : '#8a7a62';
+      ctx.lineWidth = s.type === 'solar' ? 3.2 * sc : s.type === 'gate' ? 3 : 1.5;
+      ctx.beginPath(); ctx.moveTo(X(s.x - c * len / 2), Z(s.z + sn * len / 2)); ctx.lineTo(X(s.x + c * len / 2), Z(s.z - sn * len / 2)); ctx.stroke();
+    }
     // structures
     for (const s of st.structures) {
-      if (s.type === 'fence' || s.type === 'door') continue;
-      const col = s.hp <= 0 ? '#d0533a' : { floodlight: '#ffe08a', generator: '#8fd06a', camera: '#6fe08a', barricade: '#b08a5a', trap: '#999', pole: '#776655' }[s.type] || '#bbb';
+      if (['fence', 'door', 'gate', 'solar'].includes(s.type)) continue;
+      const col = s.hp <= 0 ? '#d0533a' : { floodlight: '#ffe08a', generator: '#8fd06a', camera: '#6fe08a', barricade: '#b08a5a', trap: '#999', pole: '#776655', firepit: '#ff8a36', coop: '#e9e4d8' }[s.type] || '#bbb';
       ctx.fillStyle = col; ctx.beginPath(); ctx.arc(X(s.x), Z(s.z), 3, 0, Math.PI * 2); ctx.fill();
     }
     // landmarks discovered
@@ -362,7 +371,7 @@ export class Panels {
     ctx.fillStyle = '#ece4d2'; ctx.font = 'bold 13px Georgia'; ctx.fillText('N', W / 2 - 4, 16);
     return h('div.mapwrap', {}, c, h('div.legend', {},
       h('div', {}, h('i', { style: { background: '#d9b84a' } }), 'Ripe crops'), h('div', {}, h('i', { style: { background: '#6f8f3a' } }), 'Growing'), h('div', {}, h('i', { style: { background: '#5a2a1a' } }), 'Ruined'),
-      h('div', {}, h('i', { style: { background: '#ffe08a' } }), 'Floodlight'), h('div', {}, h('i', { style: { background: '#8fd06a' } }), 'Generator'), h('div', {}, h('i', { style: { background: '#d0533a' } }), 'Destroyed'),
+      h('div', {}, h('i', { style: { background: '#ffe08a' } }), 'Floodlight'), h('div', {}, h('i', { style: { background: '#8fd06a' } }), 'Generator'), h('div', {}, h('i', { style: { background: '#d0533a' } }), 'Destroyed / fence breach'), h('div', {}, h('i', { style: { background: '#4a6fb0' } }), 'Solar panels'),
       h('div', {}, h('i', { style: { background: '#9fb4d8' } }), 'Places of interest'), h('div', { class: 'muted', style: { marginTop: '10px', maxWidth: '220px' } }, 'Dashed outlines are land for sale. The woods are dangerous after dark.')));
   }
 
@@ -393,6 +402,7 @@ export class Panels {
       if (r.downed) items.push(h('li.bad', {}, `You didn't make it to dawn. Medical bill: ${fmtMoney(r.bill)}. Half your carried produce was lost.`));
       items.push(h('li', {}, r.cropsLost ? h('span.bad', {}, `${r.cropsLost} plots of crops destroyed (~${fmtMoney(r.cropValueLost)} of produce)`) : h('span.good', {}, 'No crops lost')));
       if (r.destroyed) items.push(h('li.bad', {}, `${r.destroyed} structures destroyed`));
+      if (r.animalsLost) items.push(h('li.bad', {}, `${r.animalsLost} hen${r.animalsLost > 1 ? 's' : ''} taken from the coop`));
       if (r.lightsBlown) items.push(h('li.bad', {}, `${r.lightsBlown} lights blown out`));
       if (r.damaged.length) items.push(h('li', {}, `Needs repair: ${r.damaged.slice(0, 6).map((d) => d.name).join(', ')}${r.damaged.length > 6 ? ` and ${r.damaged.length - 6} more` : ''}`));
       else items.push(h('li.good', {}, 'Everything is standing'));

@@ -51,8 +51,8 @@ test('land purchase requires level and money', () => {
   const sim = newSim();
   const st = sim.state;
   st.money = 10000;
-  assert.match(econ.buyParcel(sim, 'east'), /level/);
-  assert.equal(econ.buyParcel(sim, 'west'), null);
-  assert.ok(st.owned.parcels.includes('west'));
-  assert.equal(econ.buyParcel(sim, 'west'), 'Already owned');
+  assert.match(econ.buyParcel(sim, 'far'), /level/);
+  assert.equal(econ.buyParcel(sim, 'east'), null);
+  assert.ok(st.owned.parcels.includes('east'));
+  assert.equal(econ.buyParcel(sim, 'east'), 'Already owned');
 });

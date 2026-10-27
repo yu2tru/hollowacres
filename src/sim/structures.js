@@ -11,6 +11,7 @@ export function defOf(s) { return BUILDABLES[s.type] || FIXED_STRUCTURES[s.type]
 export function displayName(s) {
   const d = defOf(s);
   if (s.type === 'door') return s.building === 'barn' ? 'Barn door' : 'Farmhouse door';
+  if (s.type === 'solar') return `Solar panels (row ${s.id.split('_')[1]})`;
   if (s.level > 0 && d.upgrade) return d.upgrade.name;
   if (s.type === 'generator' && s.id === 'gen_main') return 'Main generator';
   return d.name;
@@ -32,6 +33,7 @@ export function footprint(type, x, z, rot, extra = {}) {
   if (type === 'floodlight' || type === 'pole' || type === 'camera' || type === 'chimes')
     return { kind: 'circle', x, z, r: 0.28 };
   if (type === 'scarecrow') return { kind: 'circle', x, z, r: 0.25 };
+  if (type === 'firepit') return { kind: 'circle', x, z, r: 0.9 };
   const w = extra.len || d.w;
   return { kind: 'box', x, z, hw: w / 2, hd: d.d / 2, rot };
 }
@@ -57,6 +59,7 @@ export function attachStructure(sim, s) {
   const col = sim.world.add(shape, { y0, y1, tag: 'structure', ref: s, opaque: false, solid: solidType });
   s.blocksNav = !!(def.blocks || s.type === 'door');
   s.breakable = !!def.breakable || s.type === 'door';
+  if (s.type === 'firepit' || s.type === 'solar') s.blocksNav = true;
   sim.rt.cols.set(s.id, col);
   if (s.blocksNav) sim.nav.markStructure(s, col);
   syncStructureCollision(sim, s);
@@ -73,9 +76,23 @@ export function syncStructureCollision(sim, s) {
   const col = sim.rt.cols.get(s.id);
   if (!col) return;
   const broken = s.hp <= 0;
-  if (s.type === 'door') col.enabled = !s.open && !broken;
-  else if (['barricade', 'fence'].includes(s.type)) col.enabled = !broken;
+  if (s.type === 'door' || s.type === 'gate') col.enabled = !s.open && !broken;
+  else if (['barricade', 'fence', 'coop'].includes(s.type)) col.enabled = !broken;
   else col.enabled = true;
+}
+
+// Closest point just outside a structure's footprint, from (x, z) - where a
+// creature should stand to hit it.
+export function approachPoint(s, x, z, gap = 0.9) {
+  const d = defOf(s);
+  const hw = (s.len || d.w || 1) / 2, hd = (d.d || 1) / 2;
+  if (hw < 1.2 && hd < 1.2) return { x: s.x, z: s.z, r: Math.max(hw, hd) + gap };
+  const c = Math.cos(s.rot || 0), sn = Math.sin(s.rot || 0);
+  const dx = x - s.x, dz = z - s.z;
+  const lx = dx * c - dz * sn, lz = dx * sn + dz * c;
+  const px = Math.max(-hw + 0.5, Math.min(hw - 0.5, lx));
+  const pz = (lz >= 0 ? 1 : -1) * (hd + gap);
+  return { x: s.x + px * c + pz * sn, z: s.z - px * sn + pz * c, r: 0.6 };
 }
 
 // --- placement --------------------------------------------------------------
@@ -204,7 +221,7 @@ export function damageStructure(sim, s, amount, source) {
   s.lastHitAt = sim.clockSeconds;
   if (!s._loggedHit && sim.isNight()) { s._loggedHit = true; sim.nightLog('structuresHit', 1, { id: s.id }); }
   if (s.hp <= 0) {
-    if (s.type === 'door') s.open = true;
+    if (s.type === 'door' || s.type === 'gate') s.open = true;
     if (s.type === 'floodlight') s.bulb = false;
     syncStructureCollision(sim, s);
     sim.events.emit('structureDestroyed', { s, source });
@@ -225,7 +242,7 @@ export function repairCost(s) {
   const d = defOf(s);
   const missing = clamp(1 - s.hp / s.maxHp, 0, 1);
   const mat = d.repairMat || 'planks';
-  let qty = Math.ceil(missing * (mat === 'planks' ? 3 : 2) * (s.level > 0 ? 1.5 : 1));
+  let qty = Math.ceil(missing * (d.repairQty || (mat === 'planks' ? 3 : 2)) * (s.level > 0 ? 1.5 : 1));
   if (s.type === 'floodlight' && s.bulb === false) qty = Math.max(qty, 1);
   if (s.type === 'generator') qty = Math.max(qty, missing > 0 ? 1 : 0);
   const money = Math.round(missing * (d.cost || 60) * 0.15);
@@ -240,7 +257,7 @@ export function repair(sim, s) {
   pay(sim.state, cost);
   s.hp = s.maxHp;
   if (s.type === 'floodlight') s.bulb = true;
-  if (s.type === 'door') s.open = false;
+  if (s.type === 'door' || s.type === 'gate') s.open = false;
   s._loggedHit = false;
   syncStructureCollision(sim, s);
   sim.state.stats.repairs++;
@@ -262,9 +279,23 @@ export function generatorRunning(sim, g) {
 
 export function tankSize(state) { return state.owned.bigtank ? 40 : 20; }
 
+export const autoHours = (m) => m >= 19 * 60 || m < 6 * 60 + 30;
+export function solarRunning(sim, s) { return s.type === 'solar' && s.hp > 0 && (s.charge || 0) > 0.05 && autoHours(sim.state.time.minute); }
+export function sourceRunning(sim, s) { return s.type === 'generator' ? generatorRunning(sim, s) : solarRunning(sim, s); }
+export function sourceCapacity(s) { return s.type === 'generator' ? BUILDABLES.generator.capacity : FIXED_STRUCTURES.solar.capacity; }
+
+// Solar rows charge in daylight (less under cloud) and drain while feeding the grid.
+export function updateSolar(sim, dtHours, sunLevel, cloud) {
+  const cap = FIXED_STRUCTURES.solar.store;
+  for (const s of sim.state.structures) {
+    if (s.type !== 'solar' || s.hp <= 0) continue;
+    if (sunLevel > 0.1) s.charge = Math.min(cap, (s.charge || 0) + dtHours * 1.1 * sunLevel * (1 - cloud * 0.7));
+  }
+}
+
 export function computePower(sim) {
   const { state } = sim;
-  const gens = state.structures.filter((s) => s.type === 'generator');
+  const gens = state.structures.filter((s) => s.type === 'generator' || (s.type === 'solar' && s.hp > 0));
   const poles = state.structures.filter((s) => s.type === 'pole' && s.hp > 0);
   const nodes = [...gens, ...poles];
   const R = 26;
@@ -280,9 +311,9 @@ export function computePower(sim) {
     if (!nets.has(k)) nets.set(k, { nodes: [], gens: [], capacity: 0, load: 0, consumers: [], overloaded: false });
     const net = nets.get(k);
     net.nodes.push(n);
-    if (n.type === 'generator') {
+    if (n.type === 'generator' || n.type === 'solar') {
       net.gens.push(n);
-      if (generatorRunning(sim, n)) net.capacity += BUILDABLES.generator.capacity;
+      if (sourceRunning(sim, n)) net.capacity += sourceCapacity(n);
     }
   });
   const networks = [...nets.values()].filter((n) => n.gens.length > 0);
@@ -316,10 +347,16 @@ export function computePower(sim) {
 export function burnFuel(sim, dtHours) {
   const nets = sim.rt.networks || [];
   for (const net of nets) {
-    const running = net.gens.filter((g) => generatorRunning(sim, g));
+    const running = net.gens.filter((g) => sourceRunning(sim, g));
     if (!running.length) continue;
     const loadEach = net.overloaded ? 0 : net.load / running.length;
     for (const g of running) {
+      if (g.type === 'solar') {
+        const before = g.charge;
+        g.charge = Math.max(0, g.charge - dtHours * loadEach);
+        if (before > 0.05 && g.charge <= 0.05) { sim.alert('Solar batteries are flat', g); sim.events.emit('powerChanged'); }
+        continue;
+      }
       const before = g.fuel;
       g.fuel = Math.max(0, g.fuel - dtHours * (0.32 + 0.17 * loadEach));
       if (before > 2 && g.fuel <= 2) sim.alert(`${displayName(g)} is low on fuel`, g);
@@ -346,6 +383,9 @@ export function rebuildLightSources(sim) {
     const h = BUILDINGS.farmhouse;
     out.push({ x: h.x, z: h.z, radius: 8.5, intensity: 0.75, src: HOUSE_CONSUMER });
     out.push({ x: h.x, z: h.z + h.d / 2 + 1.6, radius: 6, intensity: 0.7, src: HOUSE_CONSUMER }); // porch light
+  }
+  for (const s of sim.state.structures) {
+    if (s.type === 'firepit' && s.lit) out.push({ x: s.x, z: s.z, radius: 9, intensity: 0.85, src: s, fire: true });
   }
   for (const f of sim.rt.flares) out.push({ x: f.x, z: f.z, radius: 10, intensity: 0.9, src: null, flare: true });
   sim.rt.lights = out;

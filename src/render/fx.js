@@ -56,6 +56,7 @@ export class FX {
         case 'smoke': Object.assign(p, { vx: rnd(0.3) + (opts.wind || 0), vy: 0.6 + Math.random() * 0.4, vz: rnd(0.3), max: 2.5, size: 0.3, r: 0.25, g: 0.25, b: 0.26, a: 0.25, grav: 0, drag: 0.5, grow: 0.8 }); break;
         case 'splinter': Object.assign(p, { vx: rnd(3), vy: 1 + Math.random() * 2.5, vz: rnd(3), max: 0.9, size: 0.06, r: 0.45, g: 0.36, b: 0.26, a: 1, grav: 9 }); break;
         case 'hollow': Object.assign(p, { vx: rnd(1.2), vy: Math.random() * 1.5, vz: rnd(1.2), max: 1.4, size: 0.18, r: 0.25, g: 0.35, b: 0.7, a: 0.5, grav: -0.5, glow: true, drag: 1.5 }); break;
+        case 'fire': Object.assign(p, { x: x + rnd(0.6), z: z + rnd(0.6), vx: rnd(0.3), vy: 0.8 + Math.random() * 1.2, vz: rnd(0.3), max: 0.6 + Math.random() * 0.4, size: 0.22, r: 1, g: 0.45 + Math.random() * 0.2, b: 0.12, a: 0.85, grav: -0.6, glow: true, grow: -0.25, drag: 1 }); break;
         case 'flare': Object.assign(p, { vx: rnd(0.4), vy: 1 + Math.random(), vz: rnd(0.4), max: 0.9, size: 0.12, r: 1, g: 0.25, b: 0.15, a: 0.8, grav: -1, glow: true, grow: 0.3 }); break;
         case 'impact': Object.assign(p, { vx: rnd(2) + (opts.nx || 0) * 2, vy: Math.random() * 2, vz: rnd(2) + (opts.nz || 0) * 2, max: 0.5, size: 0.05, r: 0.55, g: 0.5, b: 0.42, a: 1, grav: 9 }); break;
       }

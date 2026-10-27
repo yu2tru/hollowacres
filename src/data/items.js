@@ -8,6 +8,7 @@ export const SUPPLIES = {
   flares:    { id: 'flares', name: 'Road flares (x3)', cost: 24, qty: 3, desc: 'Thrown light. Scares Gnawers. Draws Drifters.' },
   batteries: { id: 'batteries', name: 'Batteries (x2)', cost: 8, qty: 2, desc: 'Flashlight battery swap (R with no weapon out, or auto).' },
   medkit:    { id: 'medkit', name: 'First aid kit', cost: 22, desc: 'Restores 60 health.' },
+  chicken:   { id: 'chicken', name: 'Laying hen', cost: 30, desc: 'Lays an egg every morning. Roosts in the coop at night. Up to 12.' },
   fertilizer:{ id: 'fertilizer', name: 'Fertilizer', cost: 10, desc: 'Apply to a plot: +30% yield for its next crop.' },
 };
 

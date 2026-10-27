@@ -39,6 +39,14 @@ export const CROPS = {
   },
 };
 
+// Animal products share the produce/market system but can't be planted.
+CROPS.egg = {
+  id: 'egg', name: 'Eggs', seedCost: 0, growHours: 1, yield: 1, value: 5, regrowHours: 0, water: 0,
+  level: 99, tall: false, gnawerAppeal: 0, produce: 'Eggs', color: [0.92, 0.88, 0.78], animal: true,
+  note: 'Laid each morning by your chickens. Collect them at the coop.',
+};
+
 export const CROP_IDS = Object.keys(CROPS);
+export const PLANTABLE = CROP_IDS.filter((id) => !CROPS[id].animal);
 // stages: 0 seed, 1 sprout, 2 young, 3 mature, 4 ripe
 export const STAGE_NAMES = ['Seeded', 'Sprouting', 'Growing', 'Maturing', 'Ripe'];

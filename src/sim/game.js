@@ -22,6 +22,8 @@ import { computeFocus, doInteract } from './interact.js';
 import { Creature } from './creatures/base.js';
 import { BRAINS } from './creatures/brains.js';
 import { Director } from './director.js';
+import { updateAnimals, layEggs, syncChickens } from './animals.js';
+import { ROAD } from '../data/layout.js';
 
 export const DAY_LENGTHS = { short: 0.35, normal: 0.5, long: 0.8 }; // real seconds per game minute
 const DIFF_DMG = { easy: 0.65, normal: 1, hard: 1.3 };
@@ -29,8 +31,8 @@ const DIFF_DMG = { easy: 0.65, normal: 1, hard: 1.3 };
 export const OBJECTIVES = [
   { id: 'letter', text: 'Read the letter on the kitchen table' },
   { id: 'plant', text: 'Plant seeds in the South Field  (5 = seeds, LMB on a plot, Q = seed type)' },
-  { id: 'water', text: 'Fill the can at the well pump (E) and water your crops  (4 = can, LMB)' },
-  { id: 'generator', text: 'Check the generator behind the house - refuel it before dark' },
+  { id: 'water', text: 'Fill the can at the pump by the pond (E) and water your crops  (4 = can, LMB)' },
+  { id: 'generator', text: 'Check the generator in the fenced yard to the north-east - refuel it before dark' },
   { id: 'night', text: 'Survive the night. Stay near the lights.' },
   { id: 'repair', text: 'Repair anything damaged  (6 = hammer, hold LMB)' },
   { id: 'sell', text: 'Harvest ripe crops (E) and sell them at the shipping bin' },
@@ -81,7 +83,7 @@ export class GameSim {
   }
 
   freshNightStats() {
-    return { cropsLost: 0, cropValueLost: 0, structuresHit: 0, structuresDestroyed: 0, lightsBlown: 0, kills: {}, downed: false, damageTaken: 0, fuelStart: 0 };
+    return { animalsLost: 0, cropsLost: 0, cropValueLost: 0, structuresHit: 0, structuresDestroyed: 0, lightsBlown: 0, kills: {}, downed: false, damageTaken: 0, fuelStart: 0 };
   }
 
   // ---------------------------------------------------------------- world --
@@ -105,7 +107,7 @@ export class GameSim {
     for (const c of this.world.colliders) {
       if (c.tag.endsWith('_roof') || c.tag === 'furniture' || c.tag === 'porch') continue;
       if (c.y0 > heightAt(c.x, c.z) + 1.5) continue; // lintels
-      const isWall = ['farmhouse', 'barn', 'shed', 'silo', 'ruin'].includes(c.tag) && c.opaque;
+      const isWall = ['farmhouse', 'barn', 'shed', 'ruin', 'prop'].includes(c.tag) && c.opaque;
       nav.rasterize(c, (i) => { nav.blocked[i] = 1; if (isWall) nav.opaque[i] = 1; }, c.tag === 'tree' ? 0.05 : 0.15);
     }
     // vegetation density for sight attenuation
@@ -173,7 +175,7 @@ export class GameSim {
     if (Math.abs(x - h.x) < h.w / 2 && z > h.z - h.d / 2 && z < h.z + h.d / 2 + h.porch.depth) return 'wood';
     const b = BUILDINGS.barn;
     if (Math.abs(x - b.x) < b.w / 2 && Math.abs(z - b.z) < b.d / 2) return 'wood';
-    if (distToDriveway(x, z) < 2.6 || Math.abs(z - 72) < 3.5) return 'gravel';
+    if (distToDriveway(x, z) < 2.6 || Math.abs(z - ROAD.county.z) < 3.5) return 'gravel';
     if (farming.plotAt(this.state, x, z) || distToPaths(x, z) < 1.2) return 'dirt';
     if (this.state.weather.wetness > 0.5) return 'mud';
     return 'grass';
@@ -262,7 +264,7 @@ export class GameSim {
     if (c.def.lightFear) {
       const fear = c.def.lightFear;
       c.extraCost = (i) => {
-        if (c.pack && c.pack.hunger > 160) return 0;
+        if (c.pack && c.pack.hunger > 160 && c.pack.alive() >= 3) return 0;
         const p = this.nav.cellCenter(i);
         return S.artificialLightAt(this, p.x, p.z) + this.ambient > fear ? 60 : 0;
       };
@@ -389,6 +391,8 @@ export class GameSim {
       for (const t of actors) {
         const f = remain * (pending.includes(t) ? 0.5 : 1);
         if (t === 'gnawer') {
+          const coop = st.structures.find((q) => q.type === 'coop');
+          if (coop && coop.hp <= 0 && st.animals.chickens > 0 && this.rng.chance(0.5 * f)) { st.animals.chickens--; this.nightStats.animalsLost++; }
           for (let k = 0; k < Math.round(2 * f + this.rng.next()); k++) { const p = crops.shift(); if (p) farming.damagePlot(this, p, 1, null); }
         } else if (t === 'drifter' || t === 'antlered' || t === 'pale') {
           const targets = st.structures.filter((s) => s.hp > 0 && (t === 'drifter' ? ['floodlight', 'generator', 'camera'] : t === 'pale' ? ['door'] : ['generator', 'barricade', 'fence', 'pole']).includes(s.type));
@@ -557,6 +561,8 @@ export class GameSim {
     clock.updateWeather(st, this.rng, dMin);
     farming.updatePlots(this, dtH);
     S.burnFuel(this, dtH);
+    const sun = Math.max(0, Math.min(1, clock.sunState(cur).elevation * 2));
+    S.updateSolar(this, dtH, sun, this.weatherDef().cloud);
     const crossed = (mark) => clock.crossed(prev, cur, mark);
     if (crossed(6 * 60) || crossed(14 * 60)) farming.runSprinklers(this);
     if (crossed(19 * 60) || crossed(6 * 60 + 30)) this._powerDirty = true;
@@ -591,7 +597,7 @@ export class GameSim {
     const ns = this.nightStats;
     const damaged = st.structures.filter((s) => S.needsRepair(s)).map((s) => ({ id: s.id, name: S.displayName(s), hp: s.hp, maxHp: s.maxHp }));
     const report = {
-      night: st.time.day, cropsLost: ns.cropsLost, cropValueLost: Math.round(ns.cropValueLost),
+      night: st.time.day, animalsLost: ns.animalsLost, cropsLost: ns.cropsLost, cropValueLost: Math.round(ns.cropValueLost),
       damaged, destroyed: ns.structuresDestroyed, lightsBlown: ns.lightsBlown, kills: { ...ns.kills },
       downed: ns.downed, bill: ns.bill || 0, damageTaken: Math.round(ns.damageTaken),
       fuelUsed: Math.max(0, Math.round((ns.fuelStart - st.structures.filter((s) => s.type === 'generator').reduce((a, g) => a + g.fuel, 0)) * 10) / 10),
@@ -603,6 +609,8 @@ export class GameSim {
     this.rng = new Rng((st.seed ^ (st.time.day * 2654435761)) >>> 0);
     econ.rollMarket(st, this.rng);
     econ.rollContracts(this, this.rng);
+    layEggs(this);
+    for (const f of st.structures) if (f.type === 'firepit' && f.lit) { f.lit = false; this.events.emit('structureChanged', f); }
     // mail
     for (const [id, L] of Object.entries(LORE)) {
       if (L.mail && st.time.day >= L.mail && !st.lore.mail.includes(id)) {
@@ -682,6 +690,7 @@ export class GameSim {
       if (!this.isNight() && st.player.health < 100) st.player.health = Math.min(100, st.player.health + dt * 0.4);
     }
 
+    updateAnimals(this, dt);
     // power, lights, flares
     this._powerT -= dt;
     this.rt.flares = this.rt.flares.filter((f) => f.until > this.clockSeconds);

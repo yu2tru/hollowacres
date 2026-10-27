@@ -21,9 +21,9 @@ test('gnawers find and eat crops in dark fields (Test C/D)', () => {
   const plots = st.plots.filter((p) => p.field === 'A').slice(0, 6);
   for (const p of plots) { farming.plant(sim, p, 'potato'); p.growth = 40; p.stage = farming.stageFor(p); }
   const pack = sim.makePack();
-  sim.spawnCreature('gnawer', 20, 60, { pack });
-  sim.spawnCreature('gnawer', 22, 61, { pack });
-  step(sim, 90);
+  sim.spawnCreature('gnawer', -5, -64, { pack });
+  sim.spawnCreature('gnawer', -3, -65, { pack });
+  step(sim, 150);
   const dmg = plots.filter((p) => p.health < 1).length;
   assert.ok(dmg >= 1, `crops damaged: ${dmg}`);
 });

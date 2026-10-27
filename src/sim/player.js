@@ -149,7 +149,7 @@ export function selectSlot(sim, n) {
 
 export function cycleSeed(sim, dir) {
   const st = sim.state;
-  const ids = Object.keys(CROPS).filter((id) => (st.inv.seeds[id] || 0) > 0);
+  const ids = Object.keys(CROPS).filter((id) => !CROPS[id].animal && (st.inv.seeds[id] || 0) > 0);
   if (!ids.length) { sim.notify('No seeds. Buy some from the laptop in the house.', 'info'); return; }
   let i = ids.indexOf(st.player.seedType);
   i = (i + dir + ids.length) % ids.length;

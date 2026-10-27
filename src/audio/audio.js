@@ -182,6 +182,9 @@ export class AudioEngine {
       case 'click': this.tone(this.out(null, { bus: this.bus.ui }), { type: 'square', freq: 2400, dur: 0.02, gain: 0.05 }); break;
       case 'battery': case 'medkit': this.noiseBurst(this.out(null), { dur: 0.3, gain: 0.2, filter: 'bandpass', freq: 2000, q: 2 }); break;
       case 'land': this.noiseBurst(this.out(null), { type: 'brown', dur: 0.15, gain: 0.5, filter: 'lowpass', freq: 300 }); break;
+      case 'hen': { const g = o({ ref: 4 }); for (let i = 0; i < 4; i++) this.tone(g, { type: 'square', freq: rand(700, 1100), freqEnd: rand(400, 600), dur: 0.12, gain: 0.05, at: i * 0.14 }); break; }
+      case 'cluck': { const g = o({ ref: 2, rolloff: 1.5 }); for (let i = 0; i < 2; i++) this.tone(g, { type: 'triangle', freq: rand(380, 520), freqEnd: rand(300, 360), dur: 0.08, gain: 0.05, at: i * 0.18 }); break; }
+      case 'fire_light': { const g = o({ ref: 3 }); this.noiseBurst(g, { type: 'pink', dur: 1.2, gain: 0.5, filter: 'lowpass', freq: 400, freqEnd: 2000, attack: 0.3 }); break; }
       case 'stake': { const g = this.out(null); for (let i = 0; i < 3; i++) this.tone(g, { type: 'triangle', freq: 180, freqEnd: 170, dur: 1.5, gain: 0.3, at: i * 0.5 }); break; }
       case 'flare': { const g = o({ ref: 3 }); this.noiseBurst(g, { dur: 2.5, gain: 0.25, filter: 'highpass', freq: 2500, attack: 0.05 }); break; }
       // ---- creatures ----
@@ -317,6 +320,17 @@ export class AudioEngine {
         for (let i = 0; i < 180; i++) o.frequency.setValueAtTime(notes[i % notes.length], t + i * 0.5);
         n.start(); o.start(); nodes.push(n, o);
         g.gain.setTargetAtTime(0.5, ctx.currentTime, 0.1);
+      } else if (kind === 'fire') {
+        const n = ctx.createBufferSource(); n.buffer = this.pink; n.loop = true;
+        const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 900;
+        n.connect(f).connect(g); n.start(); nodes.push(n);
+        const c = ctx.createBufferSource(); c.buffer = this.white; c.loop = true;
+        const cf = ctx.createBiquadFilter(); cf.type = 'highpass'; cf.frequency.value = 3000;
+        const cg = ctx.createGain(); cg.gain.value = 0;
+        const t0 = ctx.currentTime;
+        for (let i = 0; i < 400; i++) { const tt = t0 + i * 0.3 + Math.random() * 0.25; cg.gain.setValueAtTime(Math.random() < 0.5 ? 0.8 : 0, tt); cg.gain.setValueAtTime(0, tt + 0.02); }
+        c.connect(cf).connect(cg).connect(g); c.start(); nodes.push(c);
+        g.gain.setTargetAtTime(0.18, ctx.currentTime, 0.5);
       } else if (kind === 'hollow') {
         const n = ctx.createBufferSource(); n.buffer = this.white; n.loop = true;
         const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 5200; f.Q.value = 3;

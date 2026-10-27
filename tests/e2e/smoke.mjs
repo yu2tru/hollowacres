@@ -46,15 +46,17 @@ const snap = async (name, setup, arg) => {
 };
 // interior start
 await snap('01-start', () => {});
-await snap('01b-interior', () => { const s = window.__HA.sim.state; Object.assign(s.player, { x: -18, z: -8, yaw: 1.2, pitch: -0.15 }); });
-for (const [i, slot] of [[1, 1], [2, 2], [4, 4], [6, 6]]) await snap(`01c-tool${slot}`, (sl) => { const s = window.__HA.sim.state; s.player.slot = sl; Object.assign(s.player, { x: -4, z: 2, yaw: -2.4, pitch: -0.1 }); }, slot);
-await snap('02-yard-morning', () => { const s = window.__HA.sim.state; s.time.minute = 9 * 60; Object.assign(s.player, { x: -4, z: 2, y: 0, yaw: -2.4, pitch: -0.05 }); });
-await snap('03-field', () => { const s = window.__HA.sim.state; Object.assign(s.player, { x: 3, z: 9, yaw: -2.1, pitch: -0.25 }); for (const p of s.plots.slice(0, 24)) { p.crop = ['wheat', 'potato', 'corn', 'tomato', 'pumpkin', 'strawberry'][p.col % 6]; p.growth = 200 * (p.row + 1) / 4; p.stage = Math.min(4, p.row + 1); p.moisture = 1; } window.__HA.sim.events.emit('plotChanged'); });
-await snap('04-sunset', () => { const s = window.__HA.sim.state; s.time.minute = 19 * 60 + 5; Object.assign(s.player, { x: 30, z: 30, yaw: 2.4, pitch: 0.02 }); });
-await snap('05-night-yard', () => { const s = window.__HA.sim.state; s.time.minute = 22 * 60; s.player.flashlight = true; Object.assign(s.player, { x: 8, z: 8, yaw: 2.6, pitch: -0.05 }); window.__HA.sim.events.emit('powerChanged'); });
-await snap('06-creatures', () => { const sim = window.__HA.sim, s = sim.state; Object.assign(s.player, { x: 0, z: 30, yaw: Math.PI, pitch: -0.05 }); sim.opts.godMode = true; sim.spawnCreature('drifter', -2, 40); sim.spawnCreature('pale', 3, 44); const pk = sim.makePack(); sim.spawnCreature('gnawer', -5, 38, { pack: pk }); sim.spawnCreature('antlered', 8, 46); });
+if (!process.argv.includes('--aerial-only')) await snap('01c-tool2', () => { const s = window.__HA.sim.state; s.player.slot = 2; Object.assign(s.player, { x: -6, z: 10, yaw: 0.2, pitch: -0.05 }); });
+if (!process.argv.includes('--aerial-only')) await snap('02-courtyard-morning', () => { const s = window.__HA.sim.state; s.time.minute = 9 * 60; s.player.slot = 5; Object.assign(s.player, { x: -4, z: 14, yaw: 0.25, pitch: -0.02 }); });
+if (!process.argv.includes('--aerial-only')) await snap('03-field', () => { const s = window.__HA.sim.state; Object.assign(s.player, { x: 3.5, z: -26, yaw: 0.4, pitch: -0.2 }); for (const p of s.plots.filter((q) => q.field === 'A')) { p.crop = ['wheat', 'potato', 'corn', 'tomato', 'pumpkin', 'strawberry'][p.col % 6]; p.growth = 200 * (p.row + 1) / 5; p.stage = Math.min(4, p.row); p.moisture = 1; } window.__HA.sim.events.emit('plotChanged'); });
+if (!process.argv.includes('--aerial-only')) await snap('04-pen-water', () => { const s = window.__HA.sim.state; s.time.minute = 11 * 60; Object.assign(s.player, { x: -24, z: 4, yaw: 1.9, pitch: -0.08 }); });
+if (!process.argv.includes('--aerial-only')) await snap('05-gen-barn', () => { const s = window.__HA.sim.state; Object.assign(s.player, { x: 24, z: -16, yaw: -2.2, pitch: -0.02 }); });
+if (!process.argv.includes('--aerial-only')) await snap('06-solar-sunset', () => { const s = window.__HA.sim.state; s.time.minute = 19 * 60 + 5; Object.assign(s.player, { x: 0, z: 16, yaw: -2.3, pitch: -0.05 }); });
+await snap('07-aerial', () => { const r = window.__HA.renderer; window.__HA.sim.state.time.minute = 13 * 60; r._uc = r.updateCamera; r.updateCamera = function () { this.camera.position.set(0, 150, 95); this.camera.rotation.set(-1.0, 0, 0, 'YXZ'); }; });
+await snap('08-night-firepit', () => { const r = window.__HA.renderer; r.updateCamera = r._uc; const sim = window.__HA.sim, s = sim.state; s.time.minute = 22 * 60; s.player.flashlight = true; s.structures.find((q) => q.type === 'firepit').lit = true; Object.assign(s.player, { x: -7, z: 12, yaw: 0.6, pitch: -0.08 }); sim.events.emit('powerChanged'); });
+await snap('09-creatures', () => { const sim = window.__HA.sim, s = sim.state; Object.assign(s.player, { x: -6, z: 50, yaw: Math.PI, pitch: -0.02 }); sim.opts.godMode = true; s.structures.find((q) => q.id === 'gate_main').open = true; sim.spawnCreature('drifter', -8, 62); sim.spawnCreature('pale', -3, 66); const pk = sim.makePack(); sim.spawnCreature('gnawer', -10, 60, { pack: pk }); sim.spawnCreature('antlered', 4, 68); });
 await page.waitForTimeout(2500);
-if (shots) await page.screenshot({ path: `${OUT}/07-creatures-later.jpg`, quality: 82 });
+
 const stats = await run(() => ({ fps: window.__HA.fps, calls: window.__HA.renderer.stats, creatures: window.__HA.sim.creatures.length, day: window.__HA.sim.state.time.day }));
 console.log('stats', JSON.stringify(stats));
 await browser.close();
