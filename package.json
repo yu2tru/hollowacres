@@ -1,0 +1,21 @@
+{
+  "name": "hollow-acres",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hollow Acres - first-person farming tycoon by day, survival horror by night.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "test": "node --test tests/unit/*.test.js",
+    "sim": "node tests/sim/playthrough.mjs",
+    "e2e": "node tests/e2e/smoke.mjs"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "vite": "5.4.11"
+  }
+}
