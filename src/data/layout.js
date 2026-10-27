@@ -94,6 +94,19 @@ export const PROPS = {
 const H = BUILDINGS.farmhouse, B = BUILDINGS.barn;
 const rel = (b, dx, dz) => ({ x: b.x + dx, z: b.z + dz });
 
+// Placed set-dressing (render/environment.js draws these at exactly these spots)
+Object.assign(PROPS, {
+  truck: { x: H.x + 10, z: H.z + 9.5, rot: 0.35 },
+  tractor: { x: 33, z: -18, rot: 2.4 },
+  bales: [{ x: -27.5, z: -6, rot: 0.2 }, { x: -26.6, z: -3.6, rot: 1.1 }, { x: -25.0, z: -5.2, rot: 0.6 }],
+  woodpile: { x: H.x + H.w / 2 + 0.7, z: H.z - 1 },
+  clothesline: { x: H.x - 9, z0: H.z - 4, z1: H.z + 5 },
+  wheelbarrow: { x: -18.5, z: -31, rot: 1.2 },
+  bucket: { x: 2.6, z: -34 },
+  drums: [{ x: 56.5, z: -40 }, { x: 57.3, z: -41 }, { x: 56.6, z: -42 }],
+  dock: { x: -33.5, z: 33, rot: 0.4, w: 1.4, d: 4 },
+});
+
 // Interactable fixtures (non-buildable) with positions.
 export const FIXTURES = {
   bed: rel(H, -4.2, -2.8),
@@ -102,6 +115,7 @@ export const FIXTURES = {
   table: rel(H, -0.5, 1.0),         // letter on kitchen table
   drawer: rel(H, -5.0, 2.6),        // revolver drawer
   well: { x: -29, z: 30 },          // pump at the pond
+  standpipe: { x: 3.5, z: -44.5 },  // field standpipe in the crop walkway
   shippingBin: { x: 35.5, z: 8 },
   mailbox: { x: -1, z: 79 },
   storage: rel(B, 0, 5),            // barn storage bins
@@ -119,7 +133,43 @@ export const FURNITURE = [
   { b: 'barn', x: -2, z: -7.5, hw: 2.2, hd: 0.6, h: 1.0 },           // crates
   { b: 'barn', x: 3.5, z: -6.5, hw: 1.3, hd: 0.5, h: 0.95 },         // workbench
   { b: 'barn', x: 2.5, z: 6.5, hw: 2.4, hd: 0.7, h: 1.2 },           // storage bins
+  { b: 'farmhouse', x: 5.45, z: 2.2, hw: 0.4, hd: 0.35, h: 0.9 },    // stove
+  { b: 'farmhouse', x: 5.55, z: 0.4, hw: 0.3, hd: 1.2, h: 0.9 },     // kitchen counter
+  { b: 'farmhouse', x: 4.9, z: -2.7, hw: 0.25, hd: 0.25, h: 0.5 },   // desk chair
+  { b: 'farmhouse', x: -0.5, z: 0.15, hw: 0.22, hd: 0.22, h: 0.5 },  // table chairs
+  { b: 'farmhouse', x: -0.5, z: 1.85, hw: 0.22, hd: 0.22, h: 0.5 },
+  { b: 'barn', x: 5.5, z: -6.35, hw: 0.62, hd: 1.25, h: 1.1 },       // hay stack
+  { b: 'barn', x: 4.2, z: -7.3, hw: 0.6, hd: 0.3, h: 0.6 },          // loose bale
 ];
+
+// Collision shapes for every solid outdoor prop. Shared by physics & AI.
+// { kind:'box', x, z, hw, hd, rot, h } | { kind:'circle', x, z, r, h }
+export function propSolids() {
+  const P = PROPS, out = [];
+  const box = (x, z, hw, hd, rot, h) => out.push({ kind: 'box', x, z, hw, hd, rot: rot || 0, h });
+  const circ = (x, z, r, h) => out.push({ kind: 'circle', x, z, r, h });
+  box(P.truck.x, P.truck.z, 1.0, 2.7, P.truck.rot, 2.0);
+  box(P.tractor.x, P.tractor.z, 1.0, 1.7, P.tractor.rot, 2.2);
+  for (const b of P.bales) box(b.x, b.z, 0.6, 0.75, b.rot, 1.5);
+  box(P.woodpile.x, P.woodpile.z, 0.45, 0.85, 0, 0.9);
+  circ(P.clothesline.x, P.clothesline.z0, 0.08, 2.2); circ(P.clothesline.x, P.clothesline.z1, 0.08, 2.2);
+  box(P.wheelbarrow.x, P.wheelbarrow.z, 0.4, 0.75, P.wheelbarrow.rot, 0.7);
+  circ(P.bucket.x, P.bucket.z, 0.17, 0.35);
+  for (const d of P.drums) circ(d.x, d.z, 0.3, 0.9);
+  // pump trough and shipping bin
+  box(FIXTURES.well.x + 0.2, FIXTURES.well.z + 1.05, 0.82, 0.32, 0, 0.6);
+  box(FIXTURES.shippingBin.x, FIXTURES.shippingBin.z, 0.8, 0.55, Math.PI / 2, 1.0);
+  circ(FIXTURES.mailbox.x, FIXTURES.mailbox.z, 0.12, 1.3);
+  // gateway posts and the road sign
+  const gx = COMPOUND.gate.x, gz = COMPOUND.z1, hw = COMPOUND.gate.width / 2 + 0.3;
+  circ(gx - hw, gz, 0.16, 3.6); circ(gx + hw, gz, 0.16, 3.6);
+  circ(gx + 7, ROAD.county.z - 4.5, 0.06, 2.4);
+  // porch railing (gap for the steps in front of the door)
+  const PD = H.porch.depth, rz = H.z + H.d / 2 + PD - 0.25;
+  for (const [a, b] of [[-H.w / 2 + 0.3, H.door.offset - 0.9], [H.door.offset + 0.9, H.w / 2 - 0.3]]) box(H.x + (a + b) / 2, rz, (b - a) / 2, 0.06, 0, 1.0 + H.floor);
+  return out;
+}
+
 
 // Animal pen & coop
 export const PEN = { x0: -54, x1: -30, z0: -12, z1: 14, coop: { x: -46, z: -6.5, w: 4, d: 3 } };
@@ -145,6 +195,7 @@ export const PREPLACED = [
   { type: 'door', building: 'farmhouse', id: 'door_house' },
   { type: 'door', building: 'barn', id: 'door_barn' },
   { type: 'pump', x: FIXTURES.well.x, z: FIXTURES.well.z, id: 'pump_well' },
+  { type: 'pump', x: FIXTURES.standpipe.x, z: FIXTURES.standpipe.z, id: 'pump_field' },
   { type: 'gate', x: COMPOUND.gate.x, z: COMPOUND.z1, rot: 0, id: 'gate_main', len: COMPOUND.gate.width },
   { type: 'coop', x: PEN.coop.x, z: PEN.coop.z, rot: 0, id: 'coop' },
   { type: 'firepit', x: FIREPIT.x, z: FIREPIT.z, id: 'firepit' },

@@ -4,6 +4,7 @@ import { FIELDS, PLOT_PITCH, PARCELS, PREPLACED, fenceSegments, PLAYER_SPAWN } f
 import { BUILDABLES, FIXED_STRUCTURES } from '../data/buildables.js';
 import { CROP_IDS } from '../data/crops.js';
 import { heightAt } from './terrain.js';
+import { plantStarterPatch } from './tutorial.js';
 
 export const SAVE_VERSION = 4;
 
@@ -60,7 +61,7 @@ export function createNewState(opts = {}) {
   const prices = {};
   for (const id of CROP_IDS) prices[id] = 1;
 
-  return {
+  const st = {
     version: SAVE_VERSION,
     seed,
     difficulty: opts.difficulty || 'normal',
@@ -87,11 +88,13 @@ export function createNewState(opts = {}) {
     plots: makePlots(),
     structures,
     lore: { found: [], bestiary: {}, stakes: {}, rite: 'none', mail: [], unread: [], reliefDay: -10 },
-    tutorial: { step: 0 },
+    tutorial: { step: 0, active: false, skipped: false, introSeen: false, refuels: 0 },
     night: { lastReport: null, ended: false },
-    stats: { nights: 0, kills: {}, harvested: 0, sold: 0, repairs: 0, deaths: 0, built: 0 },
+    stats: { nights: 0, kills: {}, harvested: 0, sold: 0, repairs: 0, deaths: 0, built: 0, planted: 0, watered: 0 },
     flags: { ending: false },
   };
+  plantStarterPatch(st);
+  return st;
 }
 
 // Validate & migrate loaded data. Throws on unrecoverable data.

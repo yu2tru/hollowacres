@@ -109,11 +109,11 @@ export function generateTextures(quality = 'high') {
   }
   // --- dirt (tilled soil / paths) ---
   {
-    const n1 = fbmTile(S, 8, 5, 21), n2 = fbmTile(S, 48, 2, 22), pebbles = fbmTile(S, 64, 1, 23);
-    T.dirt = build(S, (x, y, i) => n1[i] * 0.6 + n2[i] * 0.3 + (pebbles[i] > 0.78 ? 0.3 : 0),
+    const n1 = fbmTile(S, 8, 5, 21), n2 = fbmTile(S, 48, 2, 22), pebbles = fbmTile(S, 128, 1, 23);
+    T.dirt = build(S, (x, y, i) => n1[i] * 0.6 + n2[i] * 0.3 + (pebbles[i] > 0.86 ? 0.2 : 0),
       (x, y, i) => {
-        let c = mix([0.25, 0.18, 0.12], [0.4, 0.31, 0.21], n1[i]);
-        if (pebbles[i] > 0.78) c = mix(c, [0.48, 0.44, 0.38], 0.6);
+        let c = mix([0.25, 0.18, 0.12], [0.38, 0.29, 0.2], n1[i]);
+        if (pebbles[i] > 0.86) c = mix(c, [0.42, 0.38, 0.32], 0.45);
         return c;
       }, (x, y, i) => 0.88 + n2[i] * 0.1, 2.5);
   }
@@ -122,26 +122,26 @@ export function generateTextures(quality = 'high') {
     const n1 = fbmTile(S, 64, 2, 31), n2 = fbmTile(S, 128, 1, 32), n3 = fbmTile(S, 8, 3, 33);
     T.gravel = build(S, (x, y, i) => Math.pow(n1[i], 1.5) + n2[i] * 0.3,
       (x, y, i) => {
-        const g = 0.38 + n2[i] * 0.25 + (n1[i] - 0.5) * 0.25;
-        return mix([g, g * 0.97, g * 0.92], [0.35, 0.29, 0.22], clamp01(n3[i] - 0.3) * 0.6);
+        const g = 0.27 + n2[i] * 0.16 + (n1[i] - 0.5) * 0.18;
+        return mix([g, g * 0.96, g * 0.9], [0.3, 0.25, 0.19], clamp01(n3[i] - 0.3) * 0.7);
       }, (x, y, i) => 0.75 + n1[i] * 0.2, 4);
   }
   // --- wood planks (house siding, painted white, weathered) ---
   {
-    const grain = fbmTile(S, 4, 4, 41), n = fbmTile(S, 16, 4, 42), peel = fbmTile(S, 8, 4, 43);
+    const grain = fbmTile(S, 4, 4, 41), n = fbmTile(S, 16, 4, 42), peel = fbmTile(S, 32, 3, 43);
     const boards = 8;
     T.siding = build(S, (x, y, i) => {
       const by = (y % (S / boards)) / (S / boards);
       const lip = by < 0.06 ? -0.4 : by * 0.25;
-      return lip + grain[i] * 0.1 + (peel[i] > 0.62 ? -0.08 : 0);
+      return lip + grain[i] * 0.1 + (peel[i] > 0.8 ? -0.05 : 0);
     }, (x, y, i) => {
       const by = (y % (S / boards)) / (S / boards);
       let c = [0.86, 0.85, 0.8];
-      c = mix(c, [0.62, 0.6, 0.54], n[i] * 0.45);
-      if (peel[i] > 0.62) c = mix([0.5, 0.42, 0.33], [0.4, 0.33, 0.25], grain[i]);
+      c = mix(c, [0.7, 0.68, 0.62], n[i] * 0.35);
+      if (peel[i] > 0.8) c = mix(c, mix([0.62, 0.55, 0.45], [0.5, 0.43, 0.34], grain[i]), 0.7);
       if (by < 0.06) c = c.map((v) => v * 0.55);
       return c;
-    }, (x, y, i) => (peel[i] > 0.62 ? 0.9 : 0.7), 3);
+    }, (x, y, i) => (peel[i] > 0.8 ? 0.88 : 0.72), 3);
   }
   // --- barn boards (red, board & batten, weathered) ---
   {
@@ -198,11 +198,11 @@ export function generateTextures(quality = 'high') {
     const n = fbmTile(S, 8, 5, 81), streak = fbmTile(S, 4, 4, 82);
     const ribs = 16;
     T.metal = build(S, (x, y, i) => Math.sin((x / S) * ribs * Math.PI * 2) * 0.5 + n[i] * 0.1, (x, y, i) => {
-      const rust = clamp01((n[i] + streak[(y * S + x) % (S * S)] * 0.5 - 0.65) * 3);
-      return mix([0.5, 0.52, 0.53], [0.4, 0.2, 0.09], rust);
+      const rust = clamp01((n[i] + streak[(y * S + x) % (S * S)] * 0.5 - 0.95) * 2.5);
+      return mix([0.55, 0.57, 0.58], [0.42, 0.26, 0.15], rust * 0.8);
     }, (x, y, i) => {
-      const rust = clamp01((n[i] - 0.5) * 3);
-      return 0.38 + rust * 0.5;
+      const rust = clamp01((n[i] - 0.65) * 3);
+      return 0.42 + rust * 0.45;
     }, 6);
     T.metal.metalness = true;
   }

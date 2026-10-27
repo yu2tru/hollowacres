@@ -99,9 +99,14 @@ export class Creature {
     let nx = this.x + (dx / len) * step, nz = this.z + (dz / len) * step;
     if (!this.incorporeal) {
       const g = this.y;
-      const p = this.sim.world.resolveCircle(nx, nz, this.radius * 0.8, g + 0.3, g + 1.6,
-        (c) => c.tag !== 'furniture' || this.type === 'pale');
-      nx = p.x; nz = p.z;
+      const n = Math.max(1, Math.ceil(step / 0.15));
+      let px = this.x, pz = this.z;
+      for (let i = 0; i < n; i++) {
+        const p = this.sim.world.resolveCircle(px + (nx - this.x) / n, pz + (nz - this.z) / n, this.radius * 0.8, g + 0.3, g + 1.6,
+          (c) => c.tag !== 'furniture' || this.type === 'pale');
+        px = p.x; pz = p.z;
+      }
+      nx = px; nz = pz;
     } else {
       // incorporeal creatures still cannot pass building walls
       const p = this.sim.world.resolveCircle(nx, nz, 0.3, this.y + 0.5, this.y + 1.5, (c) => c.tag !== 'structure');

@@ -22,6 +22,10 @@ npm run preview    # serve the production build
 
 The build is one self-contained HTML file with no external assets or network calls. Every texture, mesh and sound is generated procedurally at load time.
 
+## First time?
+
+A new farm opens with a short intro and the controls, then offers a tutorial: twelve steps played in the real game (move, read the letter, plant, water, how growth works, harvest and sell, buy an upgrade, fuel the generator, build a defence, survive the first night, repair, free play). Each step completes only when you've actually done it, a waypoint points to where to go, and progress is saved with the game. You can skip it and pick it back up from the pause menu.
+
 ## Controls
 
 | Action | Default |
@@ -117,10 +121,12 @@ Presets are Low, Medium, High and Epic (auto-detected on first run), plus indivi
 ## Testing
 
 ```bash
-npm test                                   # 27 unit tests: farming, economy, structures, power, nav, AI, combat, save/load
+npm test                                   # 62 unit tests: farming, economy, structures, power, nav, AI, combat, save/load,
+                                           # collision against every solid prop and building, and the full tutorial played through
 node tests/sim/playthrough.mjs 12 diligent # 12-day headless playthrough: active farmer who builds, repairs and fights
 node tests/sim/playthrough.mjs 12 neglect  # 12-day run of a farmer who never defends (checks there's no death spiral)
-npm run build && node tests/e2e/smoke.mjs --shots   # real browser (headless Chromium): loads the game, renders day/dusk/night, spawns creatures, fails on any page error
+node tests/e2e/tour.mjs barn,crops         # screenshot tour of named viewpoints into tests/e2e/tour/
+npm run build && node tests/e2e/smoke.mjs --shots   # real browser (headless Chromium): loads the game, goes through the intro and tutorial start, renders day/dusk/night, spawns creatures, fails on any page error
 ```
 
 The playthrough script save/load round-trips the whole game every evening, so persistence is exercised under real multi-night conditions.

@@ -24,6 +24,7 @@ import { BRAINS } from './creatures/brains.js';
 import { Director } from './director.js';
 import { updateAnimals, layEggs, syncChickens } from './animals.js';
 import { ROAD } from '../data/layout.js';
+import { updateTutorial, tutorialState } from './tutorial.js';
 
 export const DAY_LENGTHS = { short: 0.35, normal: 0.5, long: 0.8 }; // real seconds per game minute
 const DIFF_DMG = { easy: 0.65, normal: 1, hard: 1.3 };
@@ -451,15 +452,12 @@ export class GameSim {
   }
 
   tutorialEvent(kind) {
-    const t = this.state.tutorial;
-    t.done = t.done || {};
-    if (t.done[kind]) return;
-    t.done[kind] = true;
-    this.events.emit('objectives');
+    const t = tutorialState(this.state);
+    if (kind === 'refuel') t.refuels = (t.refuels || 0) + 1;
+    this.events.emit('objectives', kind);
   }
   currentObjective() {
-    const done = this.state.tutorial.done || {};
-    return OBJECTIVES.find((o) => !done[o.id]) || null;
+    return null; // superseded by the step-by-step tutorial (sim/tutorial.js)
   }
 
   checkLevelUp() {
@@ -691,6 +689,8 @@ export class GameSim {
     }
 
     updateAnimals(this, dt);
+    this._tutT = (this._tutT || 0) - dt;
+    if (this._tutT <= 0) { this._tutT = 0.2; updateTutorial(this); }
     // power, lights, flares
     this._powerT -= dt;
     this.rt.flares = this.rt.flares.filter((f) => f.until > this.clockSeconds);

@@ -47,9 +47,15 @@ export function updateMovement(sim, input, dt) {
   if (input.jump && rt.grounded && !crouch && p.stamina > 8) { rt.vy = 4.4; rt.grounded = false; p.stamina -= 6; }
   rt.vy -= 17 * dt;
 
-  let nx = p.x + rt.vx * dt, nz = p.z + rt.vz * dt;
-  const res = sim.world.resolveCircle(nx, nz, RADIUS, p.y + 0.32, p.y + (crouch ? 1.2 : 1.75));
-  nx = res.x; nz = res.z;
+  // move in short sub-steps so fast movement or a long frame can't tunnel
+  // through thin walls, fences or doors
+  let nx = p.x, nz = p.z;
+  const dx = rt.vx * dt, dz = rt.vz * dt;
+  const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.12));
+  for (let i = 0; i < steps; i++) {
+    const res = sim.world.resolveCircle(nx + dx / steps, nz + dz / steps, RADIUS, p.y + 0.32, p.y + (crouch ? 1.2 : 1.75));
+    nx = res.x; nz = res.z;
+  }
   // world bounds
   const r = Math.hypot(nx, nz);
   if (r > WORLD.playRadius) {

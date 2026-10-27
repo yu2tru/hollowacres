@@ -160,7 +160,7 @@ export class SkySystem {
     this.sun.position.copy(focus).addScaledVector(dir, 150);
     this.sun.target.position.copy(focus);
     // snap shadow camera to texels to avoid shimmering
-    const sunInt = lerp(0, 3.4, smoothstep(-0.02, 0.3, elev)) * (1 - cloud * 0.72);
+    const sunInt = lerp(0, 3.6, smoothstep(-0.02, 0.3, elev)) * (1 - cloud * 0.72);
     const moonInt = 0.32 * night * (1 - cloud * 0.6);
     this.sun.intensity = useMoon ? moonInt : sunInt;
     this.sun.color.copy(useMoon ? C(0x8fa6d8) : C(0xfff3e2).lerp(C(0xff9c5a), golden));
@@ -170,7 +170,7 @@ export class SkySystem {
     const nightSky = C(0x1a2438);
     this.hemi.color.copy(nightSky).lerp(skyCol, day);
     this.hemi.groundColor.copy(C(0x0d0c0b)).lerp(C(0x5a4c38), day);
-    this.hemi.intensity = lerp(0.42, 1.0, day) * (1 - cloud * 0.25) + this.lightning * 4;
+    this.hemi.intensity = lerp(0.42, 0.62, day) * (1 - cloud * 0.15) + this.lightning * 4;
 
     // fog
     const fogDay = C(0xb4c4d4).lerp(C(0xe0b48c), golden * 0.6).lerp(C(0xa7adb3), cloud * 0.8);

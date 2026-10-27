@@ -207,7 +207,7 @@ export class Panels {
         lines.push(h('div.ds', {}, `Fuel: ${s.fuel.toFixed(1)} / ${tank} L · You have ${st.inv.fuel || 0} fuel cans (10 L each)`));
         lines.push(h('div.ds', {}, `Mode: ${s.mode.toUpperCase()} - ${s.mode === 'auto' ? 'runs 7 PM to 6:30 AM' : s.mode === 'on' ? 'always on' : 'off'}`));
         if (net) lines.push(h('div.ds', {}, `Network load: ${net.load} / ${net.capacity || 0}${net.overloaded ? ' - OVERLOADED' : ''} · burn ≈ ${(0.32 + 0.17 * net.load).toFixed(2)} L/hour while running`));
-        actions.push(h('button.btn', { disabled: !(st.inv.fuel > 0) || s.fuel >= tank - 0.1, onclick: () => this.act(() => { if (!(st.inv.fuel > 0)) return 'No fuel cans - buy them at Feed & Supply'; st.inv.fuel--; s.fuel = Math.min(tank, s.fuel + 10); sim.events.emit('powerChanged'); sim.tutorialEvent('generator'); return null; }) }, 'Refuel (+10 L)'));
+        actions.push(h('button.btn', { disabled: !(st.inv.fuel > 0) || s.fuel >= tank - 0.1, onclick: () => this.act(() => { if (!(st.inv.fuel > 0)) return 'No fuel cans - buy them at Feed & Supply'; st.inv.fuel--; s.fuel = Math.min(tank, s.fuel + 10); sim.events.emit('powerChanged'); sim.tutorialEvent('refuel'); return null; }) }, 'Refuel (+10 L)'));
         for (const m of ['auto', 'on', 'off']) actions.push(h(`button.btn${s.mode === m ? '' : '.ghost'}`, { onclick: () => this.act(() => { s.mode = m; sim.events.emit('powerChanged'); sim.events.emit('structureChanged', s); return null; }) }, m === 'auto' ? 'Auto (dusk-dawn)' : m === 'on' ? 'Always on' : 'Off'));
       }
       if (s.type === 'floodlight') {

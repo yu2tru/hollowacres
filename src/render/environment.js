@@ -4,6 +4,7 @@ import { BUILDINGS, FIXTURES, ROAD, PROPS, COMPOUND } from '../data/layout.js';
 import { heightAt } from '../sim/terrain.js';
 import { worldUV, mergeList, bx, cy, mk, wallGeo, textTexture } from './build-helpers.js';
 import { addWind } from './materials.js';
+import { truckModel, tractorModel, shippingBinModel, tankLadder } from './models.js';
 
 export function buildEnvironment(scene, M) {
   const refs = { windows: [], lamps: [], screens: {} };
@@ -27,8 +28,8 @@ function buildFarmhouse(root, M, refs) {
   const F = H.floor, W = H.w, D = H.d, WH = H.wallH, T = 0.22;
 
   // foundation & floor
-  g.add(mk(worldUV(bx(W + 0.3, F + 0.6, D + 0.3, 0, (F - 0.6) / 2 + 0.0, 0), 1.6), M.stone));
-  g.add(mk(worldUV(bx(W - 0.1, 0.06, D - 0.1, 0, F + 0.03, 0), 1.2), M.wood));
+  g.add(mk(worldUV(bx(W + 0.3, F + 0.6, D + 0.3, 0, (F - 0.6) / 2 - 0.01, 0), 1.6), M.stone));
+  g.add(mk(worldUV(bx(W - 0.1, 0.06, D - 0.1, 0, F - 0.03, 0), 1.2), M.wood));
 
   // walls with openings (door & windows)
   const winW = 1.1, winB = 0.95, winT = 2.25;
@@ -101,7 +102,7 @@ function buildFarmhouse(root, M, refs) {
   // ceiling
   g.add(mk(worldUV(bx(W - 0.3, 0.05, D - 0.3, 0, F + WH - 0.02, 0), 1.5), M.wood, false, true));
   // chimney
-  g.add(mk(worldUV(bx(0.9, RH + 2.4, 0.9, W / 2 - 1.6, F + WH + RH / 2 - 0.2, -1.2), 1.2), M.stone));
+  g.add(mk(worldUV(bx(0.9, RH + 1.0, 0.9, W / 2 - 1.6, F + WH + (RH + 1.0) / 2, -1.2), 1.2), M.stone));
 
   // porch
   const PD = H.porch.depth;
@@ -148,7 +149,7 @@ function buildFarmhouse(root, M, refs) {
   g.add(I);
   const L = (x, z) => [x - H.x, z - H.z];
   // rug
-  I.add(mk(bx(3.2, 0.015, 2.2, ...[L(-21.5, -9)[0]], F + 0.065, L(-21.5, -9)[1]), M.flannel, false));
+  I.add(mk(bx(3.2, 0.012, 2.2, 0.5, F + 0.008, 1.0), M.flannel, false));
   // bed
   {
     const [x, z] = L(FIXTURES.bed.x, FIXTURES.bed.z);
@@ -160,7 +161,7 @@ function buildFarmhouse(root, M, refs) {
   }
   // desk with laptop & monitor
   {
-    const [x, z] = L(-16.8, -13.5);
+    const x = 5.2, z = -3.5; // desk body (FURNITURE)
     I.add(mk(mergeList([bx(2.4, 0.06, 0.9, x, F + 0.78, z), bx(0.06, 0.75, 0.8, x - 1.15, F + 0.38, z), bx(0.06, 0.75, 0.8, x + 1.15, F + 0.38, z), bx(0.6, 0.6, 0.8, x + 0.8, F + 0.42, z)]), M.wood));
     const [lx, lz] = L(FIXTURES.desk.x, FIXTURES.desk.z);
     I.add(mk(bx(0.42, 0.025, 0.3, lx, F + 0.83, lz + 0.05), M.darkSteel));
@@ -215,8 +216,8 @@ function buildBarn(root, M, refs) {
   g.add(mk(worldUV(bx(W - 0.2, 0.05, D - 0.2, 0, 0.11, 0), 1.6), M.wood, false, true));
   const dW = B.door.width;
   const walls = [
-    { len: D, pos: [-W / 2, 0], ry: -Math.PI / 2, ops: [{ offset: 0, width: dW, bottom: 0, top: 3.9 }] },
-    { len: D, pos: [W / 2, 0], ry: Math.PI / 2, ops: [{ offset: 0, width: 2, bottom: 2.2, top: 3.4 }] },
+    { len: D, pos: [-W / 2, 0], ry: -Math.PI / 2, ops: [{ offset: 0, width: dW, bottom: 0, top: 3.9 }, { offset: -5.6, width: 1.2, bottom: 2.0, top: 3.0 }, { offset: 5.6, width: 1.2, bottom: 2.0, top: 3.0 }] },
+    { len: D, pos: [W / 2, 0], ry: Math.PI / 2, ops: [{ offset: -4.5, width: 1.4, bottom: 2.2, top: 3.3 }, { offset: 4.5, width: 1.4, bottom: 2.2, top: 3.3 }] },
     { len: W, pos: [0, D / 2], ry: 0, ops: [] },
     { len: W, pos: [0, -D / 2], ry: Math.PI, ops: [] },
   ];
@@ -229,6 +230,13 @@ function buildBarn(root, M, refs) {
     // white trim at top
     const tr = mk(bx(w.len + T + 0.1, 0.22, T + 0.06, 0, WH, 0), M.trim);
     tr.position.copy(m.position); tr.rotation.y = w.ry; g.add(tr);
+    // window & door frames, glazing
+    const fr = new THREE.Group(); fr.position.copy(m.position); fr.rotation.y = w.ry; g.add(fr);
+    for (const o of w.ops) {
+      const top = o.top, bot = o.bottom, hw = o.width / 2, z = T / 2 + 0.03;
+      fr.add(mk(mergeList([bx(o.width + 0.24, 0.12, 0.06, o.offset, top + 0.06, z), bx(0.12, top - bot, 0.06, o.offset - hw - 0.06, (top + bot) / 2, z), bx(0.12, top - bot, 0.06, o.offset + hw + 0.06, (top + bot) / 2, z)].concat(bot > 0 ? [bx(o.width + 0.24, 0.1, 0.1, o.offset, bot - 0.04, z + 0.02), bx(0.05, top - bot, 0.04, o.offset, (top + bot) / 2, 0), bx(o.width, 0.05, 0.04, o.offset, (top + bot) / 2, 0)] : [])), M.trim));
+      if (bot > 0) fr.add(mk(bx(o.width, top - bot, 0.015, o.offset, (top + bot) / 2, -0.02), M.glass, false));
+    }
   }
   // gambrel roof (ridge along z)
   const pts = [[-W / 2 - 0.45, WH - 0.1], [-W / 2 * 0.58, WH + RH * 0.66], [0, WH + RH], [W / 2 * 0.58, WH + RH * 0.66], [W / 2 + 0.45, WH - 0.1]];
@@ -250,8 +258,8 @@ function buildBarn(root, M, refs) {
     worldUV(gg, 3.2);
     g.add(mk(gg, M.barn));
     // hayloft door
-    g.add(mk(mergeList([bx(1.8, 1.8, 0.06, 0, WH + 1.2, sgn * (D / 2 + 0.13))]), M.barn));
-    g.add(mk(mergeList([bx(2.0, 0.12, 0.08, 0, WH + 2.15, sgn * (D / 2 + 0.15)), bx(2.0, 0.12, 0.08, 0, WH + 0.25, sgn * (D / 2 + 0.15)), bx(0.12, 2.0, 0.08, -0.95, WH + 1.2, sgn * (D / 2 + 0.15)), bx(0.12, 2.0, 0.08, 0.95, WH + 1.2, sgn * (D / 2 + 0.15)), bx(2.5, 0.1, 0.08, 0, WH + 1.2, sgn * (D / 2 + 0.16), 0, 0, 0.78), bx(2.5, 0.1, 0.08, 0, WH + 1.2, sgn * (D / 2 + 0.16), 0, 0, -0.78)]), M.trim));
+    g.add(mk(mergeList([bx(1.8, 1.8, 0.05, 0, WH + 1.2, sgn * (D / 2 + 0.155))]), M.barn));
+    g.add(mk(mergeList([bx(2.0, 0.12, 0.06, 0, WH + 2.15, sgn * (D / 2 + 0.16)), bx(2.0, 0.12, 0.06, 0, WH + 0.25, sgn * (D / 2 + 0.16)), bx(0.12, 2.0, 0.06, -0.95, WH + 1.2, sgn * (D / 2 + 0.16)), bx(0.12, 2.0, 0.06, 0.95, WH + 1.2, sgn * (D / 2 + 0.16)), bx(2.5, 0.1, 0.04, 0, WH + 1.2, sgn * (D / 2 + 0.2), 0, 0, 0.78), bx(2.5, 0.1, 0.04, 0, WH + 1.2, sgn * (D / 2 + 0.21), 0, 0, -0.78)]), M.trim));
   }
   // cupola
   g.add(mk(worldUV(bx(1.4, 1.2, 1.4, 0, WH + RH + 0.55, 0), 1.2), M.barn));
@@ -265,7 +273,11 @@ function buildBarn(root, M, refs) {
     const leaf = new THREE.Group();
     const geo = worldUV(bx(0.1, 3.85, dW / 2 + 0.05, 0, 1.98, 0), 3.2);
     leaf.add(mk(geo, M.barn));
-    leaf.add(mk(mergeList([bx(0.12, 0.14, dW / 2 + 0.05, 0.02, 3.85, 0), bx(0.12, 0.14, dW / 2 + 0.05, 0.02, 0.15, 0), bx(0.12, 3.85, 0.12, 0.02, 1.98, dW / 4 - 0.03), bx(0.12, 3.85, 0.12, 0.02, 1.98, -dW / 4 + 0.03), bx(0.1, 4.2, 0.12, 0.03, 1.98, 0, 0.5)]), M.trim));
+    // white frame and X-brace on the OUTSIDE face of the leaf (outside is -x)
+    const L2 = dW / 2 + 0.05, diag = Math.hypot(L2 - 0.2, 3.5), ang = Math.atan2(L2 - 0.2, 3.5);
+    leaf.add(mk(mergeList([bx(0.06, 0.16, L2, -0.075, 3.82, 0), bx(0.06, 0.16, L2, -0.075, 0.18, 0), bx(0.06, 3.85, 0.14, -0.075, 1.98, L2 / 2 - 0.07), bx(0.06, 3.85, 0.14, -0.075, 1.98, -L2 / 2 + 0.07),
+      bx(0.05, diag, 0.14, -0.08, 1.98, 0, ang), bx(0.05, diag, 0.14, -0.085, 1.98, 0, -ang)]), M.trim));
+    leaf.add(mk(mergeList([cy(0.07, 0.07, 0.05, 12, 0, 3.98, L2 / 2 - 0.25, 0, Math.PI / 2), cy(0.07, 0.07, 0.05, 12, 0, 3.98, -L2 / 2 + 0.25, 0, Math.PI / 2), bx(0.04, 0.5, 0.04, -0.13, 1.3, sgn > 0 ? -L2 / 2 + 0.25 : L2 / 2 - 0.25)]), M.darkSteel));
     leaf.position.set(-W / 2 - 0.2, 0.1, sgn * dW / 4);
     leaf.userData.closedZ = sgn * dW / 4;
     leaf.userData.openZ = sgn * (dW / 4 + dW / 2);
@@ -348,6 +360,8 @@ function buildProps(root, M, refs) {
     root.add(mk(body, galv));
     root.add(mk(new THREE.ConeGeometry(t.r + 0.1, 0.6, 28).translate(t.x, y + t.h + 0.3, t.z), M.steel));
     root.add(mk(cy(t.r + 0.25, t.r + 0.3, 0.25, 28, t.x, y + 0.1, t.z), M.concrete));
+    const lad = tankLadder(t.r, t.h); lad.position.set(t.x, y, t.z); lad.rotation.y = Math.PI / 2; root.add(lad);
+    root.add(mk(mergeList([cy(0.06, 0.06, 0.5, 10, t.x - t.r - 0.2, y + 0.4, t.z, 0, Math.PI / 2), cy(0.09, 0.09, 0.12, 10, t.x - t.r - 0.45, y + 0.4, t.z, 0, Math.PI / 2)]), M.steel));
   }
   {
     const p = PROPS.pumpHouse, y = at(p.x, p.z);
@@ -362,61 +376,47 @@ function buildProps(root, M, refs) {
   {
     const { x, z } = FIXTURES.well;
     const y = at(x, z);
-    root.add(mk(worldUV(cy(1.2, 1.3, 0.25, 20, x, y + 0.05, z), 1), M.concrete));
-    const iron = new THREE.MeshStandardMaterial({ color: 0x2b2f2c, roughness: 0.5, metalness: 0.7 });
-    root.add(mk(mergeList([cy(0.09, 0.11, 1.1, 10, x, y + 0.7, z), cy(0.06, 0.06, 0.5, 8, x, y + 1.05, z + 0.25, Math.PI / 2 - 0.3), bx(0.04, 0.04, 0.9, x, y + 1.3, z - 0.35, -0.6)]), iron));
     root.add(mk(worldUV(mergeList([bx(1.6, 0.08, 0.6, x + 0.2, y + 0.3, z + 1.05), bx(1.6, 0.45, 0.06, x + 0.2, y + 0.5, z + 0.78), bx(1.6, 0.45, 0.06, x + 0.2, y + 0.5, z + 1.32), bx(0.06, 0.45, 0.6, x - 0.58, y + 0.5, z + 1.05), bx(0.06, 0.45, 0.6, x + 0.98, y + 0.5, z + 1.05)]), 1), M.wood));
     const water = new THREE.MeshStandardMaterial({ color: 0x1f2b2a, roughness: 0.05, metalness: 0.1 });
     root.add(mk(bx(1.45, 0.02, 0.48, x + 0.2, y + 0.62, z + 1.05), water, false));
     root.add(mk(cy(0.16, 0.13, 0.3, 12, x - 0.9, y + 0.15, z + 0.4), M.steel));
     // little dock into the pond
-    root.add(mk(worldUV(bx(1.4, 0.1, 4, -33.5, at(-33.5, 33) + 0.15, 33, 0, 0.4), 1.2), M.wood));
+    { const d = PROPS.dock; const dk = new THREE.Group(); dk.position.set(d.x, at(d.x, d.z), d.z); dk.rotation.y = d.rot;
+      const planks = []; for (let i = 0; i < 12; i++) planks.push(bx(d.w, 0.05, d.d / 12 - 0.03, 0, 0.18, -d.d / 2 + (i + 0.5) * d.d / 12));
+      dk.add(mk(worldUV(mergeList(planks), 1.2), M.wood));
+      dk.add(mk(mergeList([cy(0.07, 0.07, 1.2, 8, -d.w / 2, -0.35, d.d / 2 - 0.2), cy(0.07, 0.07, 1.2, 8, d.w / 2, -0.35, d.d / 2 - 0.2), cy(0.07, 0.07, 1.2, 8, -d.w / 2, -0.35, -0.5), cy(0.07, 0.07, 1.2, 8, d.w / 2, -0.35, -0.5)]), M.woodDark));
+      root.add(dk); }
   }
   // ---- generator yard: gravel pad edging, spare concrete pads, fuel drums
   for (const g of PROPS.genPads) root.add(mk(worldUV(bx(2.6, 0.18, 1.8, g.x, at(g.x, g.z) + 0.04, g.z), 1.3), M.concrete));
   root.add(mk(worldUV(bx(2.6, 0.18, 1.8, 40, at(40, -46) + 0.02, -46), 1.3), M.concrete));
   const drum = new THREE.MeshStandardMaterial({ color: 0x8a1a12, roughness: 0.5, metalness: 0.4 });
-  for (const [x, z] of [[56.5, -40], [57.3, -41], [56.6, -42]]) root.add(mk(cy(0.3, 0.3, 0.9, 14, x, at(x, z) + 0.45, z), drum));
+  for (const d of PROPS.drums) root.add(mk(mergeList([cy(0.3, 0.3, 0.9, 18, d.x, at(d.x, d.z) + 0.45, d.z), cy(0.305, 0.305, 0.03, 18, d.x, at(d.x, d.z) + 0.3, d.z), cy(0.305, 0.305, 0.03, 18, d.x, at(d.x, d.z) + 0.6, d.z)]), drum));
   // ---- storage yard: crates, barrels
   for (const c of PROPS.crates) root.add(mk(worldUV(bx(c.w, 1.1, c.d, c.x, at(c.x, c.z) + 0.55, c.z), 0.9), M.wood));
   root.add(mk(worldUV(bx(1.0, 0.9, 1.0, 41.4, at(41, 8) + 1.55, 8.1, 0, 0.3), 0.9), M.wood));
   const barrel = new THREE.MeshStandardMaterial({ color: 0x31475a, roughness: 0.55, metalness: 0.5 });
   for (const b of PROPS.barrels) root.add(mk(cy(0.32, 0.32, 0.92, 14, b.x, at(b.x, b.z) + 0.46, b.z), barrel));
-  // ---- old pickup by the house
-  {
-    const g = new THREE.Group();
-    const tx = H.x + 10, tz = H.z + 9;
-    g.position.set(tx, at(tx, tz), tz); g.rotation.y = 0.35;
-    const paint = new THREE.MeshStandardMaterial({ color: 0x4d6a7a, roughness: 0.55, metalness: 0.35 });
-    g.add(mk(mergeList([bx(1.9, 0.7, 2.0, 0, 0.95, 1.4), bx(1.85, 0.55, 1.4, 0, 1.55, 0.1)]), paint));
-    g.add(mk(mergeList([bx(1.9, 0.12, 2.2, 0, 0.7, -1.5), bx(0.08, 0.55, 2.2, -0.92, 1.0, -1.5), bx(0.08, 0.55, 2.2, 0.92, 1.0, -1.5), bx(1.9, 0.55, 0.08, 0, 1.0, -2.6)]), M.ironRust));
-    g.add(mk(mergeList([bx(1.7, 0.42, 0.04, 0, 1.6, 0.82, -0.25), bx(0.04, 0.4, 1.0, -0.94, 1.6, 0.1), bx(0.04, 0.4, 1.0, 0.94, 1.6, 0.1)]), M.glass));
-    g.add(mk(mergeList([bx(2.0, 0.2, 0.15, 0, 0.6, 2.45), bx(2.0, 0.15, 0.15, 0, 0.55, -2.65)]), M.steel));
-    for (const [x, z] of [[-0.95, 1.6], [0.95, 1.6], [-0.95, -1.5], [0.95, -1.5]]) g.add(mk(cy(0.38, 0.38, 0.28, 16, x, 0.38, z, 0, Math.PI / 2), M.rubber));
-    root.add(g);
-  }
-  // ---- rusted tractor by the barn
-  {
-    const g = new THREE.Group();
-    g.position.set(34, at(34, -18), -18); g.rotation.y = 2.4;
-    const red = new THREE.MeshStandardMaterial({ color: 0x7a2a16, roughness: 0.7, metalness: 0.3 });
-    g.add(mk(mergeList([bx(0.9, 0.8, 2.4, 0, 1.2, 0.3), bx(1.2, 0.2, 1.0, 0, 1.6, -0.9)]), red));
-    g.add(mk(mergeList([cy(0.75, 0.75, 0.4, 18, -0.85, 0.75, -0.8, 0, Math.PI / 2), cy(0.75, 0.75, 0.4, 18, 0.85, 0.75, -0.8, 0, Math.PI / 2), cy(0.42, 0.42, 0.25, 14, -0.65, 0.42, 1.3, 0, Math.PI / 2), cy(0.42, 0.42, 0.25, 14, 0.65, 0.42, 1.3, 0, Math.PI / 2)]), M.rubber));
-    g.add(mk(mergeList([cy(0.06, 0.06, 1.0, 8, 0.3, 2.0, 1.0), bx(0.5, 0.06, 0.4, 0, 1.75, -0.6)]), M.darkSteel));
-    root.add(g);
-  }
+  // ---- old pickup by the house, rusted tractor by the barn
+  { const t = truckModel(); t.position.set(PROPS.truck.x, at(PROPS.truck.x, PROPS.truck.z), PROPS.truck.z); t.rotation.y = PROPS.truck.rot; root.add(t); }
+  { const t = tractorModel(); t.position.set(PROPS.tractor.x, at(PROPS.tractor.x, PROPS.tractor.z), PROPS.tractor.z); t.rotation.y = PROPS.tractor.rot; root.add(t); }
   // round hay bales near the pen
-  for (const [x, z, r] of [[-27.5, -6, 0.2], [-26.8, -3.8, 1.1], [-25.4, -5.2, 0.6]]) root.add(mk(cy(0.75, 0.75, 1.2, 20, x, at(x, z) + 0.75, z, 0, Math.PI / 2).rotateY(r), M.hay));
+  for (const b of PROPS.bales) {
+    const bale = new THREE.CylinderGeometry(0.75, 0.75, 1.2, 24, 3); bale.rotateZ(Math.PI / 2);
+    const m = mk(bale, M.hay); m.position.set(b.x, at(b.x, b.z) + 0.72, b.z); m.rotation.y = b.rot; root.add(m);
+    const wrap = mk(mergeList([cy(0.765, 0.765, 0.04, 24, -0.3, 0, 0, 0, Math.PI / 2), cy(0.765, 0.765, 0.04, 24, 0.3, 0, 0, 0, Math.PI / 2)]), M.cloth, false);
+    wrap.position.copy(m.position); wrap.rotation.y = b.rot; root.add(wrap);
+  }
   // woodpile against the house
   {
     const parts = [];
-    const x0 = H.x + H.w / 2 + 0.8, z0 = H.z - 1;
+    const x0 = PROPS.woodpile.x, z0 = PROPS.woodpile.z;
     for (let r = 0; r < 4; r++) for (let i = 0; i < 7 - r; i++) parts.push(cy(0.11, 0.11, 0.9, 7, x0, 0.12 + r * 0.2, z0 - 0.7 + i * 0.22 + r * 0.1, Math.PI / 2));
     const m = mk(mergeList(parts), M.bark); m.position.y = at(x0, z0); root.add(m);
   }
   // clothesline west of the house
   {
-    const x0 = H.x - 9, z0 = H.z - 4, z1 = H.z + 5;
+    const x0 = PROPS.clothesline.x, z0 = PROPS.clothesline.z0, z1 = PROPS.clothesline.z1;
     const y = at(x0, z0);
     root.add(mk(mergeList([cy(0.05, 0.06, 2.2, 6, x0, y + 1.1, z0), cy(0.05, 0.06, 2.2, 6, x0, y + 1.1, z1), bx(0.06, 0.06, 1.2, x0, y + 2.1, z0, 0, Math.PI / 2), bx(0.06, 0.06, 1.2, x0, y + 2.1, z1, 0, Math.PI / 2)]), M.woodDark));
     root.add(mk(cy(0.006, 0.006, z1 - z0, 3, x0, y + 2.1, (z0 + z1) / 2, Math.PI / 2), M.black, false));
@@ -432,15 +432,7 @@ function buildProps(root, M, refs) {
     m.position.set(l.x, at(l.x, l.z) + 0.22, l.z); m.rotation.y = -l.rot; root.add(m);
   }
   // shipping bin
-  {
-    const { x, z } = FIXTURES.shippingBin;
-    const g = new THREE.Group(); g.position.set(x, at(x, z), z); g.rotation.y = Math.PI / 2;
-    g.add(mk(worldUV(bx(1.6, 0.9, 1.1, 0, 0.45, 0), 0.9), M.wood));
-    g.add(mk(worldUV(bx(1.7, 0.08, 1.2, 0, 0.98, -0.05, -0.12), 0.9), M.woodDark));
-    const sign = new THREE.MeshStandardMaterial({ map: textTexture(['SHIPPING'], { font: 'bold 80px Georgia' }), roughness: 0.9 });
-    g.add(mk(bx(1.0, 0.3, 0.02, 0, 0.55, -0.56), sign, false));
-    root.add(g);
-  }
+  { const { x, z } = FIXTURES.shippingBin; const g = shippingBinModel(M); g.position.set(x, at(x, z), z); g.rotation.y = Math.PI / 2; root.add(g); }
   // mailbox with flag, by the road
   {
     const { x, z } = FIXTURES.mailbox;
@@ -486,9 +478,9 @@ function buildProps(root, M, refs) {
     root.add(mk(bx(0.1, 0.9, 0.1, x, at(x, z) + 0.45, z), M.white, false));
   }
   // wheelbarrow & buckets by the crop walkway
-  root.add(mk(cy(0.16, 0.13, 0.3, 12, 2.6, at(2.6, -34) + 0.15, -34), M.steel));
+  root.add(mk(mergeList([cy(0.16, 0.13, 0.3, 14, PROPS.bucket.x, at(PROPS.bucket.x, PROPS.bucket.z) + 0.15, PROPS.bucket.z)]), M.steel));
   {
-    const g = new THREE.Group(); g.position.set(-18.5, at(-18.5, -31), -31); g.rotation.y = 1.2;
+    const g = new THREE.Group(); g.position.set(PROPS.wheelbarrow.x, at(PROPS.wheelbarrow.x, PROPS.wheelbarrow.z), PROPS.wheelbarrow.z); g.rotation.y = PROPS.wheelbarrow.rot;
     g.add(mk(mergeList([bx(0.7, 0.3, 0.9, 0, 0.45, 0), bx(0.04, 0.04, 1.1, -0.3, 0.45, -0.9), bx(0.04, 0.04, 1.1, 0.3, 0.45, -0.9)]), M.paintGreen));
     g.add(mk(cy(0.2, 0.2, 0.08, 12, 0, 0.2, 0.45, 0, Math.PI / 2), M.rubber));
     root.add(g);

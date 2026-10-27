@@ -1,6 +1,6 @@
 import { fbm } from '../core/noise.js';
 import { smoothstep, clamp } from '../core/math.js';
-import { POND, ROAD, LANDMARKS } from '../data/layout.js';
+import { POND, ROAD, LANDMARKS, BUILDINGS, FIELDS, PLOT_PITCH, PEN, PROPS, FIREPIT, SOLAR } from '../data/layout.js';
 
 // Pure terrain height function shared by simulation and renderer.
 // The farm sits in a gently undulating basin; hills rise beyond the forest.
@@ -33,7 +33,25 @@ export function distToPaths(x, z) {
   return d;
 }
 
-export function heightAt(x, z) {
+// Level building pads: rectangles [x0, z0, x1, z1] flattened to the natural
+// height at their centre, blending back into the land over `PAD_BLEND` metres.
+const PAD_BLEND = 5;
+const PADS = (() => {
+  const pads = [];
+  const r = (x0, z0, x1, z1) => pads.push({ x0, z0, x1, z1 });
+  for (const b of Object.values(BUILDINGS)) r(b.x - b.w / 2 - 1, b.z - b.d / 2 - 1, b.x + b.w / 2 + 1, b.z + b.d / 2 + 1 + (b.porch ? b.porch.depth + 1 : 0));
+  for (const f of FIELDS) r(f.x0 - 1, f.z0 - 1, f.x0 + f.cols * PLOT_PITCH + 1, f.z0 + f.rows * PLOT_PITCH + 1);
+  r(PEN.coop.x - 3, PEN.coop.z - 2.5, PEN.coop.x + 3, PEN.coop.z + 3.5);
+  r(31, -57, 60, -25);                                   // generator yard
+  for (const t of PROPS.tanks) r(t.x - 3, t.z - 3, t.x + 3, t.z + 3);
+  r(PROPS.pumpHouse.x - 2.5, PROPS.pumpHouse.z - 2.5, PROPS.pumpHouse.x + 2.5, PROPS.pumpHouse.z + 2.5);
+  for (const row of SOLAR.rows) r(row.x - row.len / 2 - 2, row.z - 2.5, row.x + row.len / 2 + 2, row.z + 2.5);
+  r(FIREPIT.x - 6, FIREPIT.z - 6, FIREPIT.x + 6, FIREPIT.z + 6);
+  r(35, 4, 54, 13);                                      // storage yard
+  return pads;
+})();
+
+function baseHeight(x, z) {
   // radial weight: 0 in the farm basin, 1 in the hills
   const ex = x / 1.15, ez = z;
   const r = Math.hypot(ex, ez);
@@ -65,6 +83,19 @@ export function heightAt(x, z) {
         smoothstep(100, 175, Math.hypot(l.x / 1.15, l.z)) * ((fbm(l.x * 0.009, l.z * 0.009, 4, SEED + 3) - 0.35) * 22);
       h = h * (1 - t * 0.85) + base * t * 0.85;
     }
+  }
+  return h;
+}
+
+export function heightAt(x, z) {
+  let h = baseHeight(x, z);
+  for (const p of PADS) {
+    const dx = Math.max(p.x0 - x, 0, x - p.x1), dz = Math.max(p.z0 - z, 0, z - p.z1);
+    const d = Math.hypot(dx, dz);
+    if (d >= PAD_BLEND) continue;
+    if (p.h == null) p.h = baseHeight((p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2);
+    const t = 1 - smoothstep(0, PAD_BLEND, d);
+    h = h * (1 - t) + p.h * t;
   }
   return h;
 }

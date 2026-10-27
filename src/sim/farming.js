@@ -92,7 +92,8 @@ export function plant(sim, plot, cropId) {
   if (err) return err;
   if ((state.inv.seeds[cropId] || 0) <= 0) return `No ${CROPS[cropId].name.toLowerCase()} seeds`;
   state.inv.seeds[cropId]--;
-  Object.assign(plot, { crop: cropId, growth: 0, stage: 0, health: 1, harvests: 0, dead: false, ripeHours: 0 });
+  state.stats.planted = (state.stats.planted || 0) + 1;
+  Object.assign(plot, { crop: cropId, growth: 0, stage: 0, health: 1, harvests: 0, dead: false, ripeHours: 0, starter: false });
   sim.events.emit('plotChanged', plot);
   return null;
 }
@@ -100,6 +101,7 @@ export function plant(sim, plot, cropId) {
 export function water(sim, plot) {
   if (!plotOwned(sim.state, plot)) return 'You don\'t own this field yet';
   plot.moisture = 1;
+  sim.state.stats.watered = (sim.state.stats.watered || 0) + 1;
   sim.events.emit('plotChanged', plot);
   return null;
 }

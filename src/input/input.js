@@ -20,6 +20,8 @@ export class Input {
     window.addEventListener('blur', () => { this.down.clear(); this.mouse.left = this.mouse.right = false; });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.canvas;
+      // Browsers can report one large jump while the lock engages; drop it.
+      if (this.locked) { this.lockedAt = performance.now(); this.firstMove = true; this.mouse.dx = this.mouse.dy = 0; }
       this.onLockChange?.(this.locked);
     });
     canvas.addEventListener('mousedown', (e) => {
@@ -33,7 +35,9 @@ export class Input {
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('mousemove', (e) => {
-      if (!this.locked) return;
+      if (!this.locked || performance.now() - (this.lockedAt || 0) < 120) return;
+      // The first event after locking can carry the cursor's whole jump, even when it arrives late on a busy page.
+      if (this.firstMove) { this.firstMove = false; if (Math.hypot(e.movementX || 0, e.movementY || 0) > 120) return; }
       // clamp spikes some browsers produce on lock
       const cx = Math.max(-300, Math.min(300, e.movementX || 0)), cy = Math.max(-300, Math.min(300, e.movementY || 0));
       this.mouse.dx += cx; this.mouse.dy += cy;

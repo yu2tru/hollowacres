@@ -12,7 +12,7 @@ const OUT = path.resolve('tests/e2e/out');
 fs.mkdirSync(OUT, { recursive: true });
 const shots = process.argv.includes('--shots');
 
-const server = await createServer({ root: path.resolve('.'), server: { port: 5199 }, logLevel: 'error' });
+const server = await createServer({ root: path.resolve('.'), server: { port: 5199, hmr: false, watch: null }, logLevel: 'error' });
 await server.listen();
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 1024, height: 576 } });
@@ -34,9 +34,17 @@ await page.waitForSelector('.menu-btn');
 if (shots) await page.screenshot({ path: `${OUT}/00-title.jpg`, quality: 80 });
 await page.click('text=New farm');
 await page.click('text=Begin');
-await page.waitForFunction(() => window.__HA && window.__HA.state === 'paused' && window.__HA.renderer, null, { timeout: 180000 });
+await page.waitForFunction(() => window.__HA && window.__HA.renderer && (window.__HA.menus.screen === 'intro' || window.__HA.state === 'paused'), null, { timeout: 180000 });
 console.log('loaded in', ((Date.now() - t0) / 1000).toFixed(1), 's');
-await page.click('text=Click to begin');
+// First-time intro: premise + controls, then the tutorial starts.
+if (shots) await page.screenshot({ path: `${OUT}/00b-intro.jpg`, quality: 80, timeout: 120000 });
+await page.click('text=Start with the tutorial');
+await page.waitForTimeout(300);
+const tut = await page.evaluate(() => ({ active: window.__HA.sim.state.tutorial.active, card: !!document.querySelector('.tutorial') }));
+if (!tut.active || !tut.card) { console.log('TUTORIAL NOT SHOWN', tut); errors.push('tutorial did not start'); }
+await page.waitForTimeout(1500);
+// Only click through if the mouse is not already captured: moving the mouse while locked turns the view.
+if (!(await page.evaluate(() => window.__HA.input.locked)) && await page.isVisible('text=Click to begin')) await page.click('text=Click to begin');
 await page.waitForTimeout(500);
 const run = async (fn, arg) => page.evaluate(fn, arg);
 const snap = async (name, setup, arg) => {
@@ -44,8 +52,10 @@ const snap = async (name, setup, arg) => {
   await page.waitForTimeout(1500);
   if (shots) await page.screenshot({ path: `${OUT}/${name}.jpg`, quality: 82, timeout: 120000 });
 };
-// interior start
+// interior start: the view must still be level after the click that locks the mouse
 await snap('01-start', () => {});
+const view = await page.evaluate(() => ({ pitch: window.__HA.sim.state.player.pitch, yaw: window.__HA.sim.state.player.yaw }));
+if (Math.abs(view.pitch) > 0.25) errors.push('start view is not level: ' + JSON.stringify(view));
 if (!process.argv.includes('--aerial-only')) await snap('01c-tool2', () => { const s = window.__HA.sim.state; s.player.slot = 2; Object.assign(s.player, { x: -6, z: 10, yaw: 0.2, pitch: -0.05 }); });
 if (!process.argv.includes('--aerial-only')) await snap('02-courtyard-morning', () => { const s = window.__HA.sim.state; s.time.minute = 9 * 60; s.player.slot = 5; Object.assign(s.player, { x: -4, z: 14, yaw: 0.25, pitch: -0.02 }); });
 if (!process.argv.includes('--aerial-only')) await snap('03-field', () => { const s = window.__HA.sim.state; Object.assign(s.player, { x: 3.5, z: -26, yaw: 0.4, pitch: -0.2 }); for (const p of s.plots.filter((q) => q.field === 'A')) { p.crop = ['wheat', 'potato', 'corn', 'tomato', 'pumpkin', 'strawberry'][p.col % 6]; p.growth = 200 * (p.row + 1) / 5; p.stage = Math.min(4, p.row); p.moisture = 1; } window.__HA.sim.events.emit('plotChanged'); });

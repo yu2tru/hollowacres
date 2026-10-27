@@ -6,6 +6,7 @@ import { heightAt } from '../sim/terrain.js';
 import { lightProps, generatorRunning } from '../sim/structures.js';
 import { mergeList, bx, cy, mk, worldUV } from './build-helpers.js';
 import { U } from './materials.js';
+import { generatorModel } from './models.js';
 
 const coneMat = new THREE.ShaderMaterial({
   uniforms: { uColor: { value: new THREE.Color(1, 0.92, 0.78) }, uIntensity: { value: 0.18 }, uTime: U.uTime },
@@ -102,20 +103,9 @@ export function buildStructureMesh(type, M, level = 0, s = {}) {
       break;
     }
     case 'generator': {
-      const frame = [];
-      for (const [x, z] of [[-0.75, -0.45], [0.75, -0.45], [-0.75, 0.45], [0.75, 0.45]]) frame.push(cy(0.03, 0.03, 1.0, 6, x, 0.5, z));
-      frame.push(bx(1.55, 0.05, 0.05, 0, 1.0, -0.45), bx(1.55, 0.05, 0.05, 0, 1.0, 0.45), bx(1.55, 0.05, 0.05, 0, 0.05, -0.45), bx(1.55, 0.05, 0.05, 0, 0.05, 0.45));
-      g.add(mk(mergeList(frame), M.darkSteel));
-      parts.body = new THREE.Group();
-      parts.body.add(mk(bx(1.2, 0.35, 0.75, 0.05, 0.82, 0), M.paintYellow));
-      parts.body.add(mk(bx(0.7, 0.5, 0.6, -0.2, 0.38, 0), M.darkSteel));
-      parts.body.add(mk(bx(0.45, 0.45, 0.5, 0.4, 0.36, 0), M.steel));
-      parts.body.add(mk(cy(0.07, 0.07, 0.5, 8, 0.65, 0.5, 0.25, 0, Math.PI / 2), M.darkSteel));
-      const panel = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0x30ff60, emissiveIntensity: 0 });
-      parts.body.add(mk(bx(0.25, 0.15, 0.02, -0.2, 0.55, 0.31), panel, false));
-      parts.panel = panel;
-      g.add(parts.body);
-      // fuel cans beside the main generator
+      const m = generatorModel(M);
+      g.add(m.group);
+      parts.body = m.body; parts.panel = m.panel;
       break;
     }
     case 'camera': {
@@ -251,7 +241,17 @@ export function buildStructureMesh(type, M, level = 0, s = {}) {
       parts.ember = ember;
       break;
     }
-    case 'pump': default: break;
+    case 'pump': {
+      const iron = new THREE.MeshStandardMaterial({ color: 0x2b2f2c, roughness: 0.5, metalness: 0.7 });
+      g.add(mk(worldUV(cy(0.75, 0.8, 0.16, 20, 0, 0.02, 0), 1), M.concrete));
+      g.add(mk(mergeList([cy(0.16, 0.2, 0.12, 14, 0, 0.16, 0), cy(0.09, 0.11, 0.95, 12, 0, 0.65, 0), cy(0.11, 0.09, 0.12, 12, 0, 1.15, 0), cy(0.04, 0.05, 0.36, 8, 0, 0.92, 0.2, Math.PI / 2 - 0.35)]), iron));
+      parts.handle = new THREE.Group(); parts.handle.position.set(0, 1.18, -0.06);
+      parts.handle.add(mk(mergeList([bx(0.035, 0.035, 0.85, 0, 0.05, -0.38, -0.5), cy(0.03, 0.03, 0.14, 8, 0, 0.27, -0.75, 0, Math.PI / 2)]), iron));
+      g.add(parts.handle);
+      g.add(mk(cy(0.15, 0.12, 0.28, 14, 0.42, 0.17, 0.35), M.steel));
+      break;
+    }
+    default: break;
   }
   return { group: g, parts };
 }
@@ -287,7 +287,7 @@ export class StructuresView {
     if (!this.fencePosts) {
       const cap = fences.length + 64;
       this.fencePosts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.14, 1.3, 0.14).translate(0, 0.55, 0), this.M.woodDark, cap * 2);
-      const railGeo = worldUV(new THREE.BoxGeometry(1, 0.12, 0.05), 1.4);
+      const railGeo = worldUV(new THREE.BoxGeometry(3.5, 0.12, 0.05), 1.4); // textured at true length, scaled per segment
       this.fenceRails = new THREE.InstancedMesh(railGeo, this.M.wood, cap * 3);
       for (const m of [this.fencePosts, this.fenceRails]) { m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; this.root.add(m); }
     }
@@ -309,7 +309,7 @@ export class StructuresView {
         const [x, z] = at(0, 0.06);
         const g = heightAt(x, z);
         q.setFromEuler(e.set(dead ? 1.4 : 0, f.rot, !dead && r < 0.7 ? (i % 2 ? 0.08 : -0.06) * (1 - r) * 2 : dead ? 0.15 : 0));
-        p.set(x, g + (dead ? 0.06 : y), z); sc.set(len + 0.1, 1, 1);
+        p.set(x, g + (dead ? 0.06 : y), z); sc.set((len + 0.1) / 3.5, 1, 1);
         this.fenceRails.setMatrixAt(nr++, M4.compose(p, q, sc));
       });
     }

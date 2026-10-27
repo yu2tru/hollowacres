@@ -9,6 +9,8 @@ import { currentTool, slotAvailable } from '../sim/player.js';
 import { displayName, tankSize } from '../sim/structures.js';
 import { FARM_LEVELS } from '../data/items.js';
 import { LORE, STAKES } from '../data/lore.js';
+import * as THREE from 'three';
+import { STEPS, currentStep, tutorialActive } from '../sim/tutorial.js';
 
 const SLOTS = ['shovel', 'revolver', 'shotgun', 'can', 'seeds', 'hammer', 'flare', 'medkit', 'fertilizer'];
 const SLOT_NAMES = { shovel: 'Shovel', revolver: 'Revolver', shotgun: 'Shotgun', can: 'Watering can', seeds: 'Seeds', hammer: 'Hammer', flare: 'Flares', medkit: 'First aid', fertilizer: 'Fertilizer' };
@@ -22,7 +24,9 @@ export class HUD {
     this.clock = h('div.hud-clock');
     this.sub = h('div.hud-sub');
     this.obj = h('div.hud-objective');
-    this.tl.append(this.clock, this.sub, this.obj);
+    this.tut = h('div.tutorial.hidden');
+    this.tl.append(this.clock, this.sub, this.obj, this.tut);
+    this.way = h('div.waypoint.hidden', {}, h('div.wp-dia'), h('div.wp-lbl'));
     this.tr = h('div.hud-tr');
     this.money = h('div.hud-money');
     this.level = h('div.hud-level');
@@ -51,7 +55,7 @@ export class HUD {
     this.power = h('div.power');
     this.br.append(this.ammo, this.meta, this.power);
     this.fps = h('div.fps');
-    this.el.append(this.tl, this.tr, this.alerts, this.toasts, this.cross, this.prompt, this.bl, this.hotLabel, this.hotbar, this.br, this.fps);
+    this.el.append(this.way, this.tl, this.tr, this.alerts, this.toasts, this.cross, this.prompt, this.bl, this.hotLabel, this.hotbar, this.br, this.fps);
     this.hitT = 0;
     this._last = {};
   }
@@ -85,8 +89,7 @@ export class HUD {
 
   objectiveText(sim) {
     const st = sim.state;
-    const o = sim.currentObjective();
-    if (o && st.settingsHints !== false) return { lbl: 'Objective', text: o.text };
+    if (st.time.day <= 1 && !st.lore.found.includes('realtor')) return { lbl: 'Objective', text: 'Read the letter on the kitchen table.' };
     // mystery thread
     const found = st.lore.found;
     const stakes = STAKES.filter((k) => st.lore.stakes[k]).length;
@@ -112,7 +115,9 @@ export class HUD {
     this.sub.classList.toggle('night', night);
     const obj = this.objectiveText(sim);
     this.setText(this.obj, 'obj', `<span class="lbl">${obj.lbl}</span>${obj.text}`, true);
-    this.obj.classList.toggle('hidden', !opts.hints && obj.lbl === 'Objective');
+    const tutOn = tutorialActive(st);
+    this.obj.classList.toggle('hidden', tutOn || (!opts.hints && obj.lbl === 'Objective'));
+    this.updateTutorial(sim, opts);
     // money & level
     this.setText(this.money, 'money', fmtMoney(st.money));
     const lv = farmLevel(st), nx = nextLevel(st);
@@ -172,6 +177,64 @@ export class HUD {
     this.updatePrompt(sim);
     // fps
     this.fps.textContent = opts.showFps ? `${opts.fps | 0} fps · ${opts.calls || 0} draws` : '';
+  }
+
+  keyLabel(k) {
+    const b = this.app.settings.controls.bindings;
+    if (k === 'mouse') return 'Mouse';
+    if (k === 'lmb') return 'LMB';
+    if (k === 'enter') return 'Enter';
+    if (k.startsWith('slot')) return k.slice(4);
+    return keyName(b[k]);
+  }
+
+  fillKeys(text) { return text.replace(/\{k:([a-zA-Z0-9]+)\}/g, (_, k) => `<kbd>${this.keyLabel(k)}</kbd>`); }
+
+  updateTutorial(sim, opts) {
+    const st = sim.state;
+    const step = currentStep(st);
+    this.tut.classList.toggle('hidden', !step);
+    if (!step) { this.way.classList.add('hidden'); return; }
+    const t = st.tutorial;
+    const idx = t.step;
+    let prog = '';
+    if (step.goal) {
+      const n = Math.max(0, Math.min(step.goal, step.progress(sim, t.base || {})));
+      prog = `<div class="tut-prog"><i style="width:${(n / step.goal) * 100}%"></i></div><div class="tut-count">${n} / ${step.goal}</div>`;
+    }
+    const keys = [];
+    for (let i = 0; i < step.keys.length; i += 2) keys.push(`<span>${step.keys[i].map((k) => `<kbd>${this.keyLabel(k)}</kbd>`).join('')} ${step.keys[i + 1]}</span>`);
+    const html = `<div class="tut-head"><span>Tutorial · ${idx + 1} / ${STEPS.length}</span>${this.flash ? '<b class="tut-ok">✓ Done</b>' : ''}</div>
+      <div class="tut-title">${step.title}</div><div class="tut-text">${this.fillKeys(step.text)}</div>${prog}
+      <div class="tut-keys">${keys.join('')}</div>${step.info ? '<div class="tut-next">Press <kbd>Enter</kbd> to continue</div>' : ''}`;
+    this.setText(this.tut, 'tut', html, true);
+    // waypoint
+    const target = step.target ? step.target(sim) : null;
+    const cam = opts.camera;
+    if (!target || !cam) { this.way.classList.add('hidden'); return; }
+    const p = st.player;
+    const dist = Math.hypot(target.x - p.x, target.z - p.z);
+    const v = (this._wv ||= new THREE.Vector3());
+    v.set(target.x, (target.y ?? sim.world.groundAt(target.x, target.z)) + 1.3, target.z).project(cam);
+    const behind = v.z > 1;
+    let sx = v.x, sy = v.y;
+    if (behind) { sx = -sx; sy = -sy; }
+    const off = behind || Math.abs(sx) > 0.92 || Math.abs(sy) > 0.85;
+    if (off) { const k = Math.max(Math.abs(sx) / 0.92, Math.abs(sy) / 0.85, 1e-3); sx /= k; sy /= k; }
+    this.way.classList.remove('hidden');
+    this.way.classList.toggle('edge', off);
+    const px = (sx * 0.5 + 0.5) * window.innerWidth, py = (-sy * 0.5 + 0.5) * window.innerHeight;
+    this.way.style.transform = `translate(${px}px, ${py}px)`;
+    // Near the crosshair the interaction prompt takes priority: hide the label so they don't overlap.
+    const yieldToPrompt = !off && !!sim.focus && Math.hypot(px - window.innerWidth / 2, py - window.innerHeight / 2) < 140;
+    this.setText(this.way.lastChild, 'wpl', yieldToPrompt ? '' : dist < 2.5 ? target.label : `${target.label} · ${Math.round(dist)} m`);
+    this.way.style.opacity = yieldToPrompt ? '0.25' : dist < 2 ? '0.35' : '1';
+  }
+
+  stepDone() {
+    this.flash = true;
+    clearTimeout(this._flashTO);
+    this._flashTO = setTimeout(() => { this.flash = false; }, 1400);
   }
 
   updatePrompt(sim) {

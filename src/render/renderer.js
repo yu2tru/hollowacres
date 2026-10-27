@@ -280,7 +280,7 @@ export class Renderer {
       this.envRT = rtEnv;
       this.scene.environment = rtEnv.texture;
     }
-    this.scene.environmentIntensity = lerp(0.04, 0.7, env.day);
+    this.scene.environmentIntensity = lerp(0.04, 0.45, env.day);
     // emissives tied to power
     const lit = sim.rt.housePowered;
     this.M.windowLit.emissiveIntensity = lit ? lerp(0.6, 2.6, env.night) : 0;

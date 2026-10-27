@@ -2,3 +2,4 @@ node_modules
 dist
 *.log
 tests/e2e/out
+tests/e2e/tour

@@ -17,6 +17,7 @@ import { eyePos, viewDir, slotAvailable } from './sim/player.js';
 import { heightAt } from './sim/terrain.js';
 import { farmLevel } from './sim/economy.js';
 import { clamp } from './core/math.js';
+import { startTutorial, skipTutorial, acknowledge, tutorialActive, tutorialState } from './sim/tutorial.js';
 
 const PENDING = 'hollowacres.pendingLoad';
 
@@ -103,9 +104,10 @@ export class App {
     this.menus.loading('Ready', 100);
     this.state = 'paused';
     this.hud.setVisible(true);
+    if (!tutorialState(this.sim.state).introSeen) { this.menus.tutorialIntro(); return; }
     this.menus.set(h('div.menu-screen.interactive', { onclick: () => this.resume() }, h('div.menu-col', {},
       h('h1.title', { style: { fontSize: '54px' } }, `Day ${this.sim.state.time.day}`),
-      h('div.tagline', {}, this.sim.state.time.day === 1 ? 'The Hollis place. Yours now. The realtor left a letter on the kitchen table.' : 'Back to work.'),
+      h('div.tagline', {}, 'Back to work.'),
       h('button.btn.big', {}, 'Click to begin'))), 'start');
   }
 
@@ -145,6 +147,8 @@ export class App {
     E.on('playerDown', () => this.onPlayerDown());
     E.on('ending', () => { this.endingPending = true; });
     E.on('objectives', () => {});
+    E.on('tutorialStepDone', () => { this.hud.stepDone(); A.play('coin'); });
+    E.on('tutorial', (e) => { if (e.done) this.hud.toast('Tutorial complete. The farm is yours.', 'level'); });
   }
 
   openPanel(panel, ref) {
@@ -197,7 +201,12 @@ export class App {
     this.state = 'playing';
     this.sim.paused = this.panels.isOpen() && this.sim.uiPausedTime;
     this.input.lock();
-    if (this.sim.state.time.day === 1 && !this._greeted) { this._greeted = true; setTimeout(() => this.hud.toast('Read the realtor\'s letter on the kitchen table (E).', 'info', 5000), 800); }
+
+  }
+
+  beginTutorial(on) {
+    if (on) startTutorial(this.sim); else skipTutorial(this.sim);
+    this.resume();
   }
 
   canSave() { return this.sim ? canSaveNow(this.sim) : 'No game running'; }
@@ -246,6 +255,7 @@ export class App {
     }
     if (this.state !== 'playing') return;
     const b = this.settings.controls.bindings;
+    if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !this.panels.isOpen()) { acknowledge(this.sim); return; }
     if (this.panels.open?.kind === 'cameras' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { this.panels.open.pick(e.code === 'ArrowLeft' ? -1 : 1); return; }
     if (e.code === b.ledger) { e.preventDefault(); if (this.panels.open?.kind === 'ledger') this.panels.close(); else this.panels.ledger(); return; }
     if (this.panels.isOpen()) return;
@@ -351,7 +361,7 @@ export class App {
     this.updateAudio(dt);
     if (this.panels.open?.kind === 'cameras' && this.panels.open.stamp) this.panels.open.stamp.textContent = this.panels.open.stamp.textContent.replace(/\d+:\d\d [AP]M/, require12(sim.state.time.minute));
     this.fadeV += ((this.fadeTarget || 0) - this.fadeV) * Math.min(1, dt * 1.5);
-    this.hud.update(sim, dt, { hints: this.settings.gameplay.hints, showFps: this.settings.gameplay.showFps, fps: this.fps, calls: this.renderer.stats?.calls });
+    this.hud.update(sim, dt, { camera: this.renderer.camera, hints: this.settings.gameplay.hints, showFps: this.settings.gameplay.showFps, fps: this.fps, calls: this.renderer.stats?.calls });
     const ghost = this.build.active && this.build.x != null ? { type: this.build.type, x: this.build.x, z: this.build.z, rot: this.build.rot, ok: this.build.ok } : null;
     try {
       this.renderer.render(dt, { lookDX: input.lookDX, lookDY: input.lookDY, ghost, fade: this.fadeV, onThunder: (b) => this.audio.play('thunder', b) });

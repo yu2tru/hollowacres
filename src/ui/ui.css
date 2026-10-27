@@ -183,3 +183,21 @@ input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
   .journal { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* tutorial */
+.tutorial { margin-top: 14px; width: min(380px, calc(100vw - 44px)); background: rgba(14, 12, 9, 0.78); border-left: 2px solid var(--accent); padding: 10px 14px 12px; text-shadow: none; }
+.tut-head { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--accent); }
+.tut-ok { color: var(--good); letter-spacing: .1em; }
+.tut-title { font-family: var(--serif); font-size: 19px; margin: 4px 0 4px; }
+.tut-text { font-size: 13px; line-height: 1.5; color: var(--ink); }
+.tut-keys { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; font-size: 12px; color: var(--ink-dim); }
+.tut-prog { height: 3px; background: #ffffff22; margin-top: 8px; } .tut-prog > i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+.tut-count { font-size: 11px; color: var(--ink-dim); margin-top: 3px; }
+.tut-next { margin-top: 8px; font-size: 12px; color: var(--accent); }
+.waypoint { position: absolute; left: 0; top: 0; pointer-events: none; transition: opacity .3s; }
+.wp-dia { position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; border: 2px solid var(--accent); transform: rotate(45deg); background: #d9a44133; box-shadow: 0 0 6px #000; }
+.wp-lbl { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); white-space: nowrap; font-size: 12px; color: var(--ink); text-shadow: 0 1px 3px #000; }
+.waypoint.edge .wp-dia { border-color: #fff; background: #d9a44188; }
+.tut-intro { max-width: 640px; }
+.tut-intro p { font-family: var(--serif); font-size: 17px; line-height: 1.6; color: var(--ink); }
+.tut-intro .keyhelp { margin: 14px 0 20px; }

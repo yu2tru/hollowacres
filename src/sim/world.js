@@ -1,7 +1,7 @@
 // Physical world for the simulation: colliders, floors, ray casts.
 // Colliders are 2D footprints (circle or oriented box) extruded over a y range.
 import { heightAt, isInPond } from './terrain.js';
-import { BUILDINGS, WORLD, LANDMARKS, FURNITURE, PROPS } from '../data/layout.js';
+import { BUILDINGS, WORLD, LANDMARKS, FURNITURE, PROPS, propSolids } from '../data/layout.js';
 
 const CELL = 8;
 
@@ -294,6 +294,15 @@ export function buildStaticWorld(world) {
     world.add({ kind: 'box', x: p.x, z: p.z, hw: p.w / 2, hd: p.d / 2, rot: 0 }, { y0: g - 1, y1: g + p.h, tag: 'prop' }); }
   for (const c of PROPS.crates) { const g = heightAt(c.x, c.z); world.add({ kind: 'box', x: c.x, z: c.z, hw: c.w / 2, hd: c.d / 2, rot: 0 }, { y0: g - 1, y1: g + 1.2, tag: 'prop', opaque: false }); }
   for (const r of PROPS.barrels) { const g = heightAt(r.x, r.z); world.add({ kind: 'circle', x: r.x, z: r.z, r: 0.33 }, { y0: g - 1, y1: g + 0.95, tag: 'prop', opaque: false }); }
+  for (const p of propSolids()) {
+    const g = heightAt(p.x, p.z);
+    world.add(p.kind === 'box' ? { kind: 'box', x: p.x, z: p.z, hw: p.hw, hd: p.hd, rot: p.rot } : { kind: 'circle', x: p.x, z: p.z, r: p.r },
+      { y0: g - 1, y1: g + p.h, tag: 'prop', opaque: false });
+  }
+  // walkable floors: barn planks, shed slab, pond dock
+  world.addFloor(barn.x - barn.w / 2, barn.x + barn.w / 2, barn.z - barn.d / 2, barn.z + barn.d / 2, barn.baseY + 0.13);
+  { const d = PROPS.dock; world.addFloor(d.x - 1.1, d.x + 1.1, d.z - 2, d.z + 2, heightAt(d.x, d.z) + 0.2); }
+  world.addFloor(shed.x - shed.w / 2, shed.x + shed.w / 2, shed.z - shed.d / 2, shed.z + shed.d / 2, shed.baseY + 0.15);
   for (const [x, z] of PROPS.utilityPoles) world.add({ kind: 'circle', x, z, r: 0.2 }, { y0: -5, y1: heightAt(x, z) + 9, tag: 'prop', opaque: false });
   for (const l of PROPS.logs) { const g = heightAt(l.x, l.z); world.add({ kind: 'box', x: l.x, z: l.z, hw: 0.9, hd: 0.22, rot: l.rot }, { y0: g - 1, y1: g + 0.45, tag: 'prop', opaque: false }); }
   addLandmarkColliders(world);
@@ -323,6 +332,7 @@ function addLandmarkColliders(world) {
     world.add({ kind: 'box', x: cx + cab.w / 2 - side / 2, z: cz + cab.d / 2, hw: side / 2, hd: T, rot: 0 }, opts);
   }
   const ch = LANDMARK_SHAPES.chapel, lch = L.chapel;
+  const lw = L.oldwell;
   {
     const cx = lch.x + ch.dx, cz = lch.z + ch.dz, g = heightAt(cx, cz);
     const opts = { y0: g - 1, y1: g + ch.h, tag: 'ruin' };
@@ -332,10 +342,20 @@ function addLandmarkColliders(world) {
     const side = (ch.w - ch.frontGap) / 2;
     world.add({ kind: 'box', x: cx - ch.w / 2 + side / 2, z: cz + ch.d / 2, hw: side / 2, hd: T * 1.5, rot: 0 }, opts);
   }
-  const ow = LANDMARK_SHAPES.oldwell, lw = L.oldwell;
+  const ow = LANDMARK_SHAPES.oldwell;
   world.add({ kind: 'circle', x: lw.x + ow.dx, z: lw.z + ow.dz, r: ow.r }, { y0: -50, y1: heightAt(lw.x, lw.z) + 1, tag: 'ruin', opaque: false });
   const stn = LANDMARK_SHAPES.stone, ls = L.stone;
   world.add({ kind: 'circle', x: ls.x + stn.dx, z: ls.z + stn.dz, r: stn.r }, { y0: -50, y1: heightAt(ls.x, ls.z) + stn.h, tag: 'ruin' });
+  const prop = (x, z, hw, hd, h, rot = 0) => world.add({ kind: 'box', x, z, hw, hd, rot }, { y0: heightAt(x, z) - 1, y1: heightAt(x, z) + h, tag: 'furniture', opaque: false });
+  prop(lc.x, lc.z, 0.35, 0.3, 0.6);                       // cabin crate
+  prop(lch.x, lch.z, 0.28, 0.22, 1.0);                    // lectern
+  prop(lw.x, lw.z, 0.3, 0.25, 0.55);                      // tin box crate
+  { const l = L.survey; world.add({ kind: 'circle', x: l.x, z: l.z, r: 0.55 }, { y0: -50, y1: heightAt(l.x, l.z) + 0.6, tag: 'furniture', opaque: false });
+    world.add({ kind: 'circle', x: l.x + 1.2, z: l.z, r: 0.15 }, { y0: -50, y1: heightAt(l.x, l.z) + 0.6, tag: 'furniture', opaque: false }); }
+  for (let i = 0; i < 6; i++) {                            // chapel graves
+    const x = lch.x + ch.dx + 6 + (i % 3) * 1.6, z = lch.z + ch.dz - 3 + Math.floor(i / 3) * 2.2;
+    prop(x, z, 0.26, 0.08, 0.9, 0.1 * i);
+  }
   for (const id of ['stake_n', 'stake_e', 'stake_s', 'stake_w']) {
     const l = L[id];
     world.add({ kind: 'circle', x: l.x, z: l.z - 0.9, r: 0.35 }, { y0: -50, y1: heightAt(l.x, l.z - 0.9) + 0.85, tag: 'ruin', opaque: false });

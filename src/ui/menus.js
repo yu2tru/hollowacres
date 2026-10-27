@@ -74,9 +74,26 @@ export class Menus {
     this.set(el, 'save');
   }
 
+  // ------------------------------------------------------- new-game intro
+  tutorialIntro() {
+    const b = this.app.settings.controls.bindings, k = (a) => keyName(b[a]);
+    const el = h('div.menu-screen.solid.interactive', {}, h('div.menu-col.tut-intro', { style: { width: 'min(640px, calc(100vw - 64px))' } },
+      h('h1.title', { style: { fontSize: '56px' } }, 'Hollow Acres'),
+      h('p', {}, 'You\'ve taken over an isolated farm at the edge of the Corran County woods. During the day you can rebuild the place and make it pay. But when night falls, something comes out of the trees. What you build before sunset is what keeps you alive.'),
+      h('div.keyhelp', {}, [[`${k('forward')} ${k('left')} ${k('back')} ${k('right')}`, 'Move'], ['Mouse', 'Look'], [k('sprint'), 'Sprint'], [k('crouch'), 'Crouch'], [k('jump'), 'Jump'], [k('interact'), 'Interact / harvest'], ['LMB', 'Use tool / fire'], ['1-9', 'Tools & weapons'], [k('flashlight'), 'Flashlight'], [k('build'), 'Build'], [k('ledger'), 'Ledger & inventory'], ['Esc', 'Pause, help, save']].map(([a, l]) => h('div', {}, h('span', {}, l), h('kbd', {}, a)))),
+      h('div.menu-list', {},
+        h('button.menu-btn', { onclick: () => this.app.beginTutorial(true) }, 'Start with the tutorial', h('span.s', {}, 'Recommended for your first farm. About 15 minutes, including your first night.')),
+        h('button.menu-btn', { onclick: () => this.app.beginTutorial(false) }, 'Skip the tutorial', h('span.s', {}, 'You can start it later from the pause menu. Controls are always under Esc → Controls & tips.')))));
+    this.set(el, 'intro');
+  }
+
   // ----------------------------------------------------------------- pause
   pause() {
     const sim = this.app.sim;
+    const t = sim.state.tutorial || {};
+    const tutBtn = t.done ? null : (t.active && !t.skipped)
+      ? h('button.menu-btn', { onclick: () => { this.app.beginTutorial(false); } }, 'Skip the tutorial', h('span.s', {}, `Step ${t.step + 1}: you can resume it later from here`))
+      : h('button.menu-btn', { onclick: () => { this.app.beginTutorial(true); } }, t.introSeen ? 'Resume the tutorial' : 'Start the tutorial');
     const el = h('div.menu-screen.interactive', {}, h('div.menu-col', {},
       h('h1.title', { style: { fontSize: '56px' } }, 'Paused'),
       h('div.tagline', {}, `Day ${sim.state.time.day}, ${fmtTime(sim.state.time.minute)}`),
@@ -86,6 +103,7 @@ export class Menus {
         h('button.menu-btn', { onclick: () => this.load(() => this.pause()) }, 'Load game'),
         h('button.menu-btn', { onclick: () => this.settings(() => this.pause()) }, 'Settings'),
         h('button.menu-btn', { onclick: () => this.about(() => this.pause()) }, 'Controls & tips'),
+        tutBtn,
         h('button.menu-btn', { onclick: () => { if (confirm('Quit to title? Unsaved progress since the last save will be lost.')) this.app.quitToTitle(); } }, 'Quit to title'))));
     this.set(el, 'pause');
   }

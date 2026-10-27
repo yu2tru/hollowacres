@@ -188,7 +188,7 @@ function describe(sim, c) {
   if (s.type === 'door' || s.type === 'gate') f.e = s.hp <= 0 ? null : s.open ? 'Close' : 'Open';
   else if (s.type === 'firepit') f.e = s.lit ? null : 'Light fire (2 lumber)';
   else if (s.type === 'solar' || s.type === 'coop') f.e = null;
-  else if (s.type === 'pump') { f.title = 'Well pump'; f.e = s.hp > 0 ? 'Refill watering can' : null; f.lines.push(`Can: ${st.player.water}/${st.owned.can2 ? 24 : 12}`); }
+  else if (s.type === 'pump') { f.title = s.id === 'pump_field' ? 'Field standpipe' : 'Well pump'; f.e = s.hp > 0 ? 'Refill watering can' : null; f.lines.push(`Can: ${st.player.water}/${st.owned.can2 ? 24 : 12}`); }
   else if (s.type === 'trap' && !s.armed) f.e = 'Rearm (1 spare part)';
   else if (s.type === 'decoy') f.e = s.activeUntil > sim.clockSeconds ? null : 'Switch on broadcast';
   else if (s.type !== 'fence') f.e = 'Manage';
