@@ -108,6 +108,7 @@ export class GameSim {
     for (const c of this.world.colliders) {
       if (c.tag.endsWith('_roof') || c.tag === 'furniture' || c.tag === 'porch') continue;
       if (c.y0 > heightAt(c.x, c.z) + 1.5) continue; // lintels
+      if (c.y1 < heightAt(c.x, c.z) + 0.35) continue; // pipes and the like: stepped over
       const isWall = ['farmhouse', 'barn', 'shed', 'ruin', 'prop'].includes(c.tag) && c.opaque;
       nav.rasterize(c, (i) => { nav.blocked[i] = 1; if (isWall) nav.opaque[i] = 1; }, c.tag === 'tree' ? 0.05 : 0.15);
     }

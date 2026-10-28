@@ -1,7 +1,7 @@
 // Physical world for the simulation: colliders, floors, ray casts.
 // Colliders are 2D footprints (circle or oriented box) extruded over a y range.
 import { heightAt, isInPond } from './terrain.js';
-import { BUILDINGS, WORLD, LANDMARKS, FURNITURE, PROPS, propSolids } from '../data/layout.js';
+import { BUILDINGS, WORLD, LANDMARKS, FURNITURE, PROPS, SHED_ITEMS, propSolids } from '../data/layout.js';
 
 const CELL = 8;
 
@@ -149,7 +149,9 @@ export class CollisionWorld {
   }
 
   // 3D ray vs colliders. Returns { t, collider } or null.
-  raycast(ox, oy, oz, dx, dy, dz, maxT, filter) {
+  // `porous`: let the ray through the open gaps of colliders that declare
+  // solid bands (fence rails), as a bullet would.
+  raycast(ox, oy, oz, dx, dy, dz, maxT, filter, porous = false) {
     let best = null;
     const ex = ox + dx * maxT, ez = oz + dz * maxT;
     const cands = this.query(Math.min(ox, ex) - 1, Math.min(oz, ez) - 1, Math.max(ox, ex) + 1, Math.max(oz, ez) + 1);
@@ -192,6 +194,11 @@ export class CollisionWorld {
         tIn = Math.max(tIn, t1); tOut = Math.min(tOut, t2);
       }
       if (tIn > tOut || tOut < 0) continue;
+      if (porous && c.bands) {
+        // height where the ray crosses the (thin) collider
+        const y = oy + dy * (Math.max(0, tIn) + tOut) / 2;
+        if (!c.bands().some(([b0, b1]) => y >= b0 && y <= b1)) continue;
+      }
       const t = Math.max(0, tIn);
       if (t <= maxT && (!best || t < best.t)) best = { t, collider: c };
     }
@@ -201,11 +208,24 @@ export class CollisionWorld {
   addFloor(x0, x1, z0, z1, y) { this.floors.push({ x0, x1, z0, z1, y }); }
 
   // Ground height beneath a point, considering floors reachable from `fromY`.
-  groundAt(x, z, fromY = Infinity, stepUp = 0.6) {
+  // With a radius, the tops of solid objects count too (crates, bales, logs),
+  // so a body can step or jump onto them and stand there.
+  groundAt(x, z, fromY = Infinity, stepUp = 0.6, r = 0, objStep = 0.34) {
     let g = heightAt(x, z);
     for (const f of this.floors) {
       if (x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1) {
         if (f.y <= fromY + stepUp && f.y > g) g = f.y;
+      }
+    }
+    if (r > 0 && fromY < Infinity) {
+      for (const c of this.query(x - r - 1, z - r - 1, x + r + 1, z + r + 1)) {
+        if (!c.enabled || !c.solid || c.y1 <= g || c.y1 > fromY + objStep) continue;
+        if (c.kind === 'circle') { if (Math.hypot(x - c.x, z - c.z) >= c.r + r) continue; }
+        else {
+          const { lx, lz } = this._toLocal(c, x, z);
+          if (Math.hypot(lx - Math.max(-c.hw, Math.min(c.hw, lx)), lz - Math.max(-c.hd, Math.min(c.hd, lz))) >= r) continue;
+        }
+        g = c.y1;
       }
     }
     return g;
@@ -278,6 +298,10 @@ export function buildStaticWorld(world) {
   const sb = heightAt(shed.x, shed.z);
   shed.baseY = sb;
   addWallsWithDoor(shed, sb, 'shed');
+  // shelf unit and jerrycans against the shed's back wall
+  { const f = sb + 0.15, sh = SHED_ITEMS.shelf;
+    world.add({ kind: 'box', x: shed.x + sh.x, z: shed.z + sh.z, hw: sh.w / 2 + 0.03, hd: sh.d / 2, rot: 0 }, { y0: f - 0.5, y1: f + sh.h, tag: 'furniture', opaque: false });
+    for (const c of SHED_ITEMS.cans) world.add({ kind: 'box', x: shed.x + c.x, z: shed.z + c.z, hw: 0.19, hd: 0.1, rot: 0 }, { y0: f - 0.5, y1: f + 0.7, tag: 'furniture', opaque: false }); }
 
   // interior furniture colliders - low obstacles
   for (const f of FURNITURE) {
@@ -324,12 +348,17 @@ function addLandmarkColliders(world) {
   {
     const cx = lc.x + cab.dx, cz = lc.z + cab.dz, g = heightAt(cx, cz);
     const opts = { y0: g - 1, y1: g + cab.h, tag: 'ruin' };
-    world.add({ kind: 'box', x: cx, z: cz - cab.d / 2, hw: cab.w / 2, hd: T, rot: 0 }, opts);
-    world.add({ kind: 'box', x: cx - cab.w / 2, z: cz, hw: T, hd: cab.d / 2, rot: 0 }, opts);
-    world.add({ kind: 'box', x: cx + cab.w / 2, z: cz, hw: T, hd: cab.d / 2, rot: 0 }, opts);
+    // log walls; the logs run 0.2 m past each corner
+    world.add({ kind: 'box', x: cx, z: cz - cab.d / 2, hw: cab.w / 2 + 0.35, hd: T, rot: 0 }, opts);
+    world.add({ kind: 'box', x: cx - cab.w / 2, z: cz, hw: T, hd: cab.d / 2 + 0.35, rot: 0 }, opts);
+    world.add({ kind: 'box', x: cx + cab.w / 2, z: cz, hw: T, hd: cab.d / 2 + 0.35, rot: 0 }, opts);
     const side = (cab.w - cab.doorW) / 2;
     world.add({ kind: 'box', x: cx - cab.w / 2 + side / 2, z: cz + cab.d / 2, hw: side / 2, hd: T, rot: 0 }, opts);
     world.add({ kind: 'box', x: cx + cab.w / 2 - side / 2, z: cz + cab.d / 2, hw: side / 2, hd: T, rot: 0 }, opts);
+    // door hanging open from one hinge (render: rotated -1.1 rad about y)
+    world.add({ kind: 'box', x: cx + cab.doorW * 0.5, z: cz + cab.d / 2 + 0.6, hw: (cab.doorW - 0.1) / 2, hd: 0.06, rot: -1.1 }, { y0: g - 1, y1: g + 1.95, tag: 'ruin', opaque: false });
+    // fallen half of the roof, leaning into the room
+    world.add({ kind: 'box', x: cx - 0.8, z: cz + cab.d * 0.18, hw: cab.w * 0.35, hd: cab.d * 0.22, rot: 0.2 }, { y0: g + 0.5, y1: g + 2.4, tag: 'ruin', opaque: false });
   }
   const ch = LANDMARK_SHAPES.chapel, lch = L.chapel;
   const lw = L.oldwell;
@@ -342,23 +371,37 @@ function addLandmarkColliders(world) {
     const side = (ch.w - ch.frontGap) / 2;
     world.add({ kind: 'box', x: cx - ch.w / 2 + side / 2, z: cz + ch.d / 2, hw: side / 2, hd: T * 1.5, rot: 0 }, opts);
   }
+  { // chapel rubble: fallen blocks outside the east wall
+    const cx = lch.x + ch.dx, cz = lch.z + ch.dz;
+    for (let i = 0; i < 7; i++) {
+      const x = cx + ch.w / 2 + 0.6 + (i % 3) * 0.5, z = cz - 2 + i * 0.9, r = 0.35 + (i % 3) * 0.12; // as drawn
+      world.add({ kind: 'circle', x, z, r }, { y0: -50, y1: heightAt(cx, cz) + 0.2 + r, tag: 'ruin', opaque: false });
+    }
+  }
   const ow = LANDMARK_SHAPES.oldwell;
-  world.add({ kind: 'circle', x: lw.x + ow.dx, z: lw.z + ow.dz, r: ow.r }, { y0: -50, y1: heightAt(lw.x, lw.z) + 1, tag: 'ruin', opaque: false });
+  { const wx = lw.x + ow.dx, wz = lw.z + ow.dz, wg = heightAt(wx, wz);
+    world.add({ kind: 'circle', x: wx, z: wz, r: ow.r + 0.08 }, { y0: -50, y1: wg + 0.9, tag: 'ruin', opaque: false });
+    // winch posts and crossbar
+    for (const sx of [-1, 1]) world.add({ kind: 'circle', x: wx + sx * ow.r, z: wz, r: 0.1 }, { y0: -50, y1: wg + 2.0, tag: 'ruin', opaque: false });
+    world.add({ kind: 'box', x: wx, z: wz, hw: ow.r + 0.15, hd: 0.1, rot: 0 }, { y0: wg + 1.6, y1: wg + 2.02, tag: 'ruin', opaque: false }); }
   const stn = LANDMARK_SHAPES.stone, ls = L.stone;
   world.add({ kind: 'circle', x: ls.x + stn.dx, z: ls.z + stn.dz, r: stn.r }, { y0: -50, y1: heightAt(ls.x, ls.z) + stn.h, tag: 'ruin' });
   const prop = (x, z, hw, hd, h, rot = 0) => world.add({ kind: 'box', x, z, hw, hd, rot }, { y0: heightAt(x, z) - 1, y1: heightAt(x, z) + h, tag: 'furniture', opaque: false });
   prop(lc.x, lc.z, 0.35, 0.3, 0.6);                       // cabin crate
-  prop(lch.x, lch.z, 0.28, 0.22, 1.0);                    // lectern
-  prop(lw.x, lw.z, 0.3, 0.25, 0.55);                      // tin box crate
+  prop(lch.x, lch.z, 0.32, 0.27, 1.12);                   // lectern with the book
+  prop(lw.x, lw.z, 0.3, 0.25, 0.63);                      // tin box crate
   { const l = L.survey; world.add({ kind: 'circle', x: l.x, z: l.z, r: 0.55 }, { y0: -50, y1: heightAt(l.x, l.z) + 0.6, tag: 'furniture', opaque: false });
-    world.add({ kind: 'circle', x: l.x + 1.2, z: l.z, r: 0.15 }, { y0: -50, y1: heightAt(l.x, l.z) + 0.6, tag: 'furniture', opaque: false }); }
+    world.add({ kind: 'circle', x: l.x + 1.2, z: l.z, r: 0.18 }, { y0: -50, y1: heightAt(l.x, l.z) + 1.05, tag: 'furniture', opaque: false });
+    world.add({ kind: 'circle', x: l.x - 0.8, z: l.z, r: 0.38 }, { y0: -50, y1: heightAt(l.x, l.z) + 1.55, tag: 'furniture', opaque: false }); } // tripod
   for (let i = 0; i < 6; i++) {                            // chapel graves
     const x = lch.x + ch.dx + 6 + (i % 3) * 1.6, z = lch.z + ch.dz - 3 + Math.floor(i / 3) * 2.2;
     prop(x, z, 0.26, 0.08, 0.9, 0.1 * i);
   }
   for (const id of ['stake_n', 'stake_e', 'stake_s', 'stake_w']) {
     const l = L[id];
-    world.add({ kind: 'circle', x: l.x, z: l.z - 0.9, r: 0.35 }, { y0: -50, y1: heightAt(l.x, l.z - 0.9) + 0.85, tag: 'ruin', opaque: false });
+    world.add({ kind: 'circle', x: l.x, z: l.z - 0.9, r: 0.36 }, { y0: -50, y1: heightAt(l.x, l.z - 0.9) + 0.85, tag: 'ruin', opaque: false });
+    // the iron stake leaning out of the stone (render: tilted 0.35 rad toward -x)
+    world.add({ kind: 'circle', x: l.x, z: l.z - 0.9, r: 0.2 }, { y0: heightAt(l.x, l.z - 0.9) + 0.8, y1: heightAt(l.x, l.z - 0.9) + 1.7, tag: 'ruin', opaque: false });
   }
 }
 

@@ -1,6 +1,7 @@
 // Rendering front-end: owns the three.js renderer, scene, post chain and all
 // view modules. Reads simulation state each frame; never mutates gameplay.
 import * as THREE from 'three';
+import { loadModels } from './assets.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
@@ -72,6 +73,7 @@ export class Renderer {
     this.sim = sim;
     progress('Generating materials'); await tick();
     this.M = getMaterials(g.textures || 'high');
+    await loadModels(this.renderer);
     progress('Shaping the land'); await tick();
     this.sky = new SkySystem(this.scene, g.shadows);
     const terr = createTerrain(this.M, g.foliage === 'low' ? 'low' : g.foliage === 'medium' ? 'medium' : 'high');
@@ -194,6 +196,7 @@ export class Renderer {
       this.shake = Math.max(this.shake, e.weapon === 'shotgun' ? 0.5 : 0.25);
       for (const h of e.hits) if (!h.hit) this.fx.emit('impact', h.end.x, h.end.y, h.end.z, { n: 4 });
     });
+    E.on('henKilled', (e) => { this.fx.emit('feather', e.x, e.y, e.z, { n: 26 }); this.fx.emit('ichor', e.x, e.y, e.z, { n: 6 }); });
     E.on('creatureHit', (e) => this.fx.emit('ichor', e.x ?? e.c.x, e.y ?? e.c.y + 1, e.z ?? e.c.z, { n: e.head ? 18 : 10 }));
     E.on('reload', () => this.vm.trigger('reload'));
     E.on('swing', () => this.vm.trigger('swing'));
@@ -212,7 +215,7 @@ export class Renderer {
       if (e.id === 'bulb_pop') this.fx.emit('spark', e.x, heightAt(e.x, e.z) + 5, e.z, { n: 20 });
       if (e.id === 'smash') this.fx.emit('splinter', e.x, heightAt(e.x, e.z) + 0.9, e.z, { n: 6 });
       if (e.id === 'crash') { this.fx.emit('dust', e.x, heightAt(e.x, e.z) + 0.5, e.z, { n: 14 }); const p = sim.state.player; if (Math.hypot(p.x - e.x, p.z - e.z) < 25) this.shake = Math.max(this.shake, 0.4); }
-      if (e.id === 'land') this.landDip = 0.12;
+      if (e.id === 'land') this.landKick = Math.min(0.11, 0.035 + (sim.rt.player.landV || 0) * 0.008);
     });
     E.on('structureAdded', () => { this.structs.sync(sim); });
     E.on('structureRemoved', () => { this.structs.sync(sim); });
@@ -230,7 +233,9 @@ export class Renderer {
     const reduce = this.settings.controls.reduceMotion;
     this.bobT = (this.bobT || 0) + dt * (rt.sprinting ? 12 : 8.5) * (rt.grounded && rt.speed > 0.5 ? 1 : 0);
     const bobAmt = (this.settings.controls.headBob === false || reduce) ? 0 : Math.min(1, rt.speed / 4) * (rt.sprinting ? 0.05 : 0.03);
-    this.landDip = Math.max(0, this.landDip - dt * 0.6);
+    // landing: ease down into a small knee-bend and back up, never a jump cut
+    this.landKick = (this.landKick || 0) * Math.exp(-dt * 7);
+    this.landDip += (this.landKick - this.landDip) * Math.min(1, dt * 22);
     this._eyeY = this._eyeY == null ? eye.y : lerp(this._eyeY, eye.y, Math.min(1, dt * 18));
     this.camera.position.set(eye.x, this._eyeY + Math.abs(Math.sin(this.bobT)) * bobAmt - this.landDip, eye.z);
     this.shake = Math.max(0, this.shake - dt * 2.5);

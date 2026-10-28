@@ -1,0 +1,26 @@
+<!doctype html><html><body style="margin:0;background:#888"><canvas id="c" width="1200" height="300"></canvas>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+const name = new URLSearchParams(location.search).get('m');
+const r = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true });
+r.setScissorTest(true);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x9aa3ad);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.5)); const d = new THREE.DirectionalLight(0xffffff, 2.5); d.position.set(3, 5, 4); scene.add(d);
+const L = new GLTFLoader(); L.setMeshoptDecoder(MeshoptDecoder);
+L.load(`/src/assets/models/${name}.glb`, (g) => {
+  const o = g.scene; scene.add(o);
+  const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+  const R = Math.max(s.x, s.y, s.z);
+  scene.add(new THREE.AxesHelper(R * 0.8).translateX(c.x).translateY(b.min.y).translateZ(c.z));
+  const cams = [[0, 0, 1], [1, 0, 0], [0, 0, -1], [0.7, 0.8, 0.7]];
+  cams.forEach((v, i) => {
+    const cam = new THREE.PerspectiveCamera(35, 1, R * 0.01, R * 20);
+    cam.position.copy(c).add(new THREE.Vector3(...v).normalize().multiplyScalar(R * 2.2)); cam.lookAt(c);
+    r.setViewport(i * 300, 0, 300, 300); r.setScissor(i * 300, 0, 300, 300); r.render(scene, cam);
+  });
+  const parts = []; o.traverse((m) => { if (m.isMesh) { const bb = new THREE.Box3().setFromObject(m, true); parts.push(m.name + ' ' + bb.min.toArray().map((v) => v.toFixed(2)) + ' / ' + bb.max.toArray().map((v) => v.toFixed(2))); } });
+  window.__info = { parts, precise: new THREE.Box3().setFromObject(o, true).getSize(new THREE.Vector3()).toArray().map((v) => +v.toFixed(3)), size: s.toArray().map((v) => +v.toFixed(3)), min: b.min.toArray().map((v) => +v.toFixed(3)), max: b.max.toArray().map((v) => +v.toFixed(3)) };
+}, undefined, (e) => { window.__info = { error: String(e) }; });
+</script></body></html>

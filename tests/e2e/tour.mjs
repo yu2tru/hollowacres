@@ -23,6 +23,10 @@ export const VIEWS = [
   ['truck', -24, -28, 1.0, -0.12, 600], ['tractor', 27, -13, -0.88, -0.12, 600], ['fence-corner', -55, -52, -2.4, -0.1, 600],
   ['woods-edge', 0, -70, 0, 0.02, 600], ['night-yard', -4, 14, 0.4, -0.05, 22 * 60],
   ['crops-near', -6, -33, 3.0, -0.45, 600], ['crops-corn', 2.5, -38, 1.2, -0.25, 600], ['standpipe', 7, -41, 0.79, -0.3, 600],
+  ['gen-model', 40, -42.4, 0.0, -0.3, 600], ['pump-pond', -27, 33, 0.6, -0.25, 600], ['pump-field', 5.5, -42, 0.7, -0.25, 600],
+  ['bed-model', -39.5, -38.6, 0.55, -0.35, 600], ['porch-chair', -34.5, -29.3, 0.2, -0.2, 600], ['wheelbarrow', -18.5, -28.6, 0.1, -0.3, 600],
+  ['truck-model', -21.5, -24.5, 0.9, -0.08, 600], ['pipes', -26, 26.5, 0.4, -0.3, 600], ['shed-in', 52, -48.5, 0, -0.25, 600],
+  ['firepit', 0, 9.5, 0, -0.35, 600], ['plots-flush', -12, -40, 2.5, -0.3, 600],
   ['bin-close', 31.5, 11, -0.93, -0.3, 600], ['truck-close', -24.5, -26, 0.6, -0.15, 600],
 ].filter((v) => filters.some((f) => v[0].includes(f)));
 const server = await createServer({ root: path.resolve('.'), server: { port: 5197, hmr: false, watch: null }, logLevel: 'error' });

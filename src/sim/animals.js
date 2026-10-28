@@ -2,6 +2,7 @@
 // each morning. A breached coop at night means losses.
 import { PEN } from '../data/layout.js';
 import { isNightTime } from './clock.js';
+import { heightAt } from './terrain.js';
 
 const MAX_EGGS = 40;
 export const MAX_CHICKENS = 12;
@@ -73,5 +74,23 @@ export function takeChicken(sim, by) {
   sim.nightLog('animalsLost', 1);
   sim.events.emit('sfx', { id: 'hen', x: by.x, z: by.z });
   sim.alert('Something is in the chicken coop', by);
+  return true;
+}
+
+// Hit volume of a hen (centre height above ground, radius) - matches the model.
+export const HEN_HIT = { y: 0.28, r: 0.24 };
+export function henCentre(c) { return { x: c.x, y: heightAt(c.x, c.z) + HEN_HIT.y, z: c.z }; }
+
+// A hen killed by the player (stray shot or otherwise).
+export function killChicken(sim, c) {
+  const list = sim.rt.chickens || [];
+  const i = list.indexOf(c);
+  if (i < 0 || sim.state.animals.chickens <= 0) return false;
+  list.splice(i, 1);
+  sim.state.animals.chickens--;
+  const p = henCentre(c);
+  sim.events.emit('sfx', { id: 'hen', x: c.x, z: c.z });
+  sim.events.emit('henKilled', { x: p.x, y: p.y, z: p.z });
+  sim.notify('You shot one of your hens.', 'warn');
   return true;
 }

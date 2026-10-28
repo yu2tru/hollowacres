@@ -1,6 +1,7 @@
 // Visual representation of buildable / fixed structures, including damage
 // states, lights, power cables and the build-mode ghost preview.
 import * as THREE from 'three';
+import { model } from './assets.js';
 import { BUILDABLES } from '../data/buildables.js';
 import { heightAt } from '../sim/terrain.js';
 import { lightProps, generatorRunning } from '../sim/structures.js';
@@ -103,9 +104,20 @@ export function buildStructureMesh(type, M, level = 0, s = {}) {
       break;
     }
     case 'generator': {
-      const m = generatorModel(M);
-      g.add(m.group);
-      parts.body = m.body; parts.panel = m.panel;
+      const gm = model('generator');
+      if (gm) {
+        // authored model; add a status lamp on top of the control panel (front, +z)
+        const lamp = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0x806010, emissiveIntensity: 0.6, roughness: 0.4 });
+        const sz = gm.userData.size;
+        const body = new THREE.Group();
+        body.add(gm, mk(new THREE.SphereGeometry(0.035, 10, 8).translate(sz.x * 0.28, sz.y * 0.86, sz.z / 2 - 0.06), lamp, false, false));
+        g.add(body);
+        parts.body = body; parts.panel = lamp;
+      } else {
+        const m = generatorModel(M);
+        g.add(m.group);
+        parts.body = m.body; parts.panel = m.panel;
+      }
       break;
     }
     case 'camera': {
@@ -242,6 +254,8 @@ export function buildStructureMesh(type, M, level = 0, s = {}) {
       break;
     }
     case 'pump': {
+      const pm = model('pump');
+      if (pm) { g.add(pm); break; }   // authored hand pump with its bucket (spout +z)
       const iron = new THREE.MeshStandardMaterial({ color: 0x2b2f2c, roughness: 0.5, metalness: 0.7 });
       g.add(mk(worldUV(cy(0.75, 0.8, 0.16, 20, 0, 0.02, 0), 1), M.concrete));
       g.add(mk(mergeList([cy(0.16, 0.2, 0.12, 14, 0, 0.16, 0), cy(0.09, 0.11, 0.95, 12, 0, 0.65, 0), cy(0.11, 0.09, 0.12, 12, 0, 1.15, 0), cy(0.04, 0.05, 0.36, 8, 0, 0.92, 0.2, Math.PI / 2 - 0.35)]), iron));
@@ -262,7 +276,7 @@ export class StructuresView {
     this.M = M;
     this.env = env;
     this.items = new Map();
-    this.root = new THREE.Group();
+    this.root = new THREE.Group(); this.root.name = 'structures';
     scene.add(this.root);
     this.wires = null;
   }

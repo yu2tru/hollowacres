@@ -89,6 +89,9 @@ export const PROPS = {
   barrels: [{ x: 50, z: 7.5 }, { x: 51, z: 8.6 }, { x: 50.2, z: 9.8 }, { x: 51.3, z: 10.9 }],
   utilityPoles: [[-9, 86], [-10, 66], [-26, 40.5], [-32, 15], [-46, -24]],
   logs: [{ x: 3.2, z: 1.5, rot: 0.9 }, { x: -3, z: 2, rot: -0.7 }, { x: 0.3, z: 8, rot: 0.1 }, { x: 3.6, z: 7, rot: -0.4 }],
+  // water main from the pond pump to the tanks: laid on the ground on saddles
+  pipes: [[-30, 30, -22.4, 30], [-23, 30, -23, 38]],
+  stackedCrate: { x: 41.4, z: 8.1, s: 1.0, h: 0.9, rot: 0.3 },   // sits on top of the first crate stack
 };
 
 const H = BUILDINGS.farmhouse, B = BUILDINGS.barn;
@@ -105,6 +108,7 @@ Object.assign(PROPS, {
   bucket: { x: 2.6, z: -34 },
   drums: [{ x: 56.5, z: -40 }, { x: 57.3, z: -41 }, { x: 56.6, z: -42 }],
   dock: { x: -33.5, z: 33, rot: 0.4, w: 1.4, d: 4 },
+  rockingChair: { x: H.x + 2.6, z: H.z + H.d / 2 + 1.2, rot: 0 },   // on the porch
 });
 
 // Interactable fixtures (non-buildable) with positions.
@@ -126,21 +130,39 @@ export const FIXTURES = {
 
 // Furniture colliders, relative to their building (x, z offsets; half extents; height)
 export const FURNITURE = [
-  { b: 'farmhouse', x: -4.2, z: -2.8, hw: 1.0, hd: 1.15, h: 0.7 },   // bed
-  { b: 'farmhouse', x: 5.2, z: -3.5, hw: 1.2, hd: 0.45, h: 0.8 },    // desk
+  { b: 'farmhouse', x: -4.2, z: -2.8, hw: 0.77, hd: 1.08, h: 1.24 }, // bed model 1.52 x 1.24 x 2.15 m (to the top of the headboard)
+  { b: 'farmhouse', x: 5.2, z: -3.5, hw: 1.2, hd: 0.45, h: 1.25 },   // desk with laptop & monitor
   { b: 'farmhouse', x: -0.5, z: 1.0, hw: 0.8, hd: 0.55, h: 0.8 },    // table
-  { b: 'farmhouse', x: -5.4, z: 2.6, hw: 0.3, hd: 0.6, h: 0.9 },     // dresser
-  { b: 'barn', x: -2, z: -7.5, hw: 2.2, hd: 0.6, h: 1.0 },           // crates
-  { b: 'barn', x: 3.5, z: -6.5, hw: 1.3, hd: 0.5, h: 0.95 },         // workbench
-  { b: 'barn', x: 2.5, z: 6.5, hw: 2.4, hd: 0.7, h: 1.2 },           // storage bins
+  { b: 'farmhouse', x: -5.4, z: 2.6, hw: 0.3, hd: 0.6, h: 1.5 },     // dresser with lamp
+  { b: 'barn', x: -2.0, z: -6.55, hw: 0.97, hd: 0.52, h: 1.42 },     // ledger crates (stacked)
+  { b: 'barn', x: 3.5, z: -6.05, hw: 1.32, hd: 0.48, h: 2.45 },      // workbench & pegboard
+  { b: 'barn', x: 2.5, z: 6.5, hw: 2.45, hd: 0.72, h: 1.3 },         // storage bins
   { b: 'farmhouse', x: 5.45, z: 2.2, hw: 0.4, hd: 0.35, h: 0.9 },    // stove
   { b: 'farmhouse', x: 5.55, z: 0.4, hw: 0.3, hd: 1.2, h: 0.9 },     // kitchen counter
-  { b: 'farmhouse', x: 4.9, z: -2.7, hw: 0.25, hd: 0.25, h: 0.5 },   // desk chair
-  { b: 'farmhouse', x: -0.5, z: 0.15, hw: 0.22, hd: 0.22, h: 0.5 },  // table chairs
-  { b: 'farmhouse', x: -0.5, z: 1.85, hw: 0.22, hd: 0.22, h: 0.5 },
+  { b: 'farmhouse', x: 4.9, z: -2.7, hw: 0.25, hd: 0.27, h: 1.1 },   // desk chair
+  { b: 'farmhouse', x: -0.5, z: 0.12, hw: 0.23, hd: 0.25, h: 1.05 }, // table chairs
+  { b: 'farmhouse', x: -0.5, z: 1.88, hw: 0.23, hd: 0.25, h: 1.05 },
   { b: 'barn', x: 5.5, z: -6.35, hw: 0.62, hd: 1.25, h: 1.1 },       // hay stack
   { b: 'barn', x: 4.2, z: -7.3, hw: 0.6, hd: 0.3, h: 0.6 },          // loose bale
 ];
+
+// Height of the ground pipes' centre above the terrain.
+export const PIPE_Y = 0.16;
+
+export function roadPosts() {
+  const out = [];
+  for (let x = -150; x <= 150; x += 18) {
+    if (Math.abs(x - COMPOUND.gate.x) < 6) continue;
+    out.push([x, ROAD.county.z - ROAD.county.width / 2 - 0.6]);
+  }
+  return out;
+}
+
+// Shelf and jerrycans along the back wall of the generator shed (shed-relative).
+export const SHED_ITEMS = {
+  cans: [-1.6, -1.15, -0.7].map((x) => ({ x, z: -BUILDINGS.shed.d / 2 + 0.5 })),
+  shelf: { x: 1.0, z: -BUILDINGS.shed.d / 2 + 0.35, w: 2.2, d: 0.45, h: 1.75 },
+};
 
 // Collision shapes for every solid outdoor prop. Shared by physics & AI.
 // { kind:'box', x, z, hw, hd, rot, h } | { kind:'circle', x, z, r, h }
@@ -148,18 +170,30 @@ export function propSolids() {
   const P = PROPS, out = [];
   const box = (x, z, hw, hd, rot, h) => out.push({ kind: 'box', x, z, hw, hd, rot: rot || 0, h });
   const circ = (x, z, r, h) => out.push({ kind: 'circle', x, z, r, h });
-  box(P.truck.x, P.truck.z, 1.0, 2.7, P.truck.rot, 2.0);
+  box(P.truck.x, P.truck.z, 1.14, 2.8, P.truck.rot, 2.5);              // flatbed truck model 2.27 x 2.48 x 5.6 m
   box(P.tractor.x, P.tractor.z, 1.0, 1.7, P.tractor.rot, 2.2);
   for (const b of P.bales) box(b.x, b.z, 0.6, 0.75, b.rot, 1.5);
   box(P.woodpile.x, P.woodpile.z, 0.45, 0.85, 0, 0.9);
   circ(P.clothesline.x, P.clothesline.z0, 0.08, 2.2); circ(P.clothesline.x, P.clothesline.z1, 0.08, 2.2);
-  box(P.wheelbarrow.x, P.wheelbarrow.z, 0.4, 0.75, P.wheelbarrow.rot, 0.7);
+  box(P.wheelbarrow.x, P.wheelbarrow.z, 0.4, 0.73, P.wheelbarrow.rot, 0.66); // model 0.79 x 0.66 x 1.45 m
   circ(P.bucket.x, P.bucket.z, 0.17, 0.35);
   for (const d of P.drums) circ(d.x, d.z, 0.3, 0.9);
   // pump trough and shipping bin
-  box(FIXTURES.well.x + 0.2, FIXTURES.well.z + 1.05, 0.82, 0.32, 0, 0.6);
-  box(FIXTURES.shippingBin.x, FIXTURES.shippingBin.z, 0.8, 0.55, Math.PI / 2, 1.0);
+  box(FIXTURES.well.x + 0.2, FIXTURES.well.z + 1.05, 0.82, 0.32, 0, 0.75);
+  box(FIXTURES.shippingBin.x, FIXTURES.shippingBin.z, 0.8, 0.55, Math.PI / 2, 1.12);
   circ(FIXTURES.mailbox.x, FIXTURES.mailbox.z, 0.12, 1.3);
+  circ(FIXTURES.well.x - 0.9, FIXTURES.well.z + 0.4, 0.17, 0.32);        // bucket by the pond pump
+  box(FIXTURES.mailbox.x, FIXTURES.mailbox.z, 0.15, 0.27, 0, 1.42);     // the box on the post
+  // crate stacked on the yard crates
+  { const c = P.stackedCrate; box(c.x, c.z, c.s / 2 + 0.05, c.s / 2 + 0.05, c.rot, 1.1 + c.h); }
+  // tank access ladders (east side of each tank)
+  for (const t of P.tanks) box(t.x + t.r + 0.12, t.z, 0.08, 0.26, 0, t.h + 0.4);
+  // ground pipes: low enough to step over, but you walk over them, not through
+  for (const [x0, z0, x1, z1] of P.pipes) box((x0 + x1) / 2, (z0 + z1) / 2, Math.hypot(x1 - x0, z1 - z0) / 2, 0.13, -Math.atan2(z1 - z0, x1 - x0), PIPE_Y + 0.1);
+  // road edge posts along the county road
+  for (const [x, z] of roadPosts()) circ(x, z, 0.08, 0.9);
+  // porch rocking chair
+  { const c = P.rockingChair; box(c.x, c.z + 0.04, 0.28, 0.31, c.rot, 1.12 + H.floor); } // model 0.54 x 1.12 x 0.58 m
   // gateway posts and the road sign
   const gx = COMPOUND.gate.x, gz = COMPOUND.z1, hw = COMPOUND.gate.width / 2 + 0.3;
   circ(gx - hw, gz, 0.16, 3.6); circ(gx + hw, gz, 0.16, 3.6);

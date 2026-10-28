@@ -5,9 +5,11 @@ import { CROPS } from '../data/crops.js';
 import { heightAt } from './terrain.js';
 import { clamp } from '../core/math.js';
 import * as farming from './farming.js';
+import { killChicken, henCentre, HEN_HIT } from './animals.js';
 import { repair, needsRepair, repairCost, affordable, displayName } from './structures.js';
 
 export const EYE = 1.62, EYE_CROUCH = 1.05, RADIUS = 0.34;
+export const JUMP_SPEED = 5.0, GRAVITY = 17, STEP = 0.32, AIR_STEP = 0.24;
 
 export function viewDir(p) {
   const cp = Math.cos(p.pitch);
@@ -43,17 +45,21 @@ export function updateMovement(sim, input, dt) {
   if (sprinting && wl > 0.1) p.stamina = Math.max(0, p.stamina - dt * 17);
   else p.stamina = Math.min(100, p.stamina + dt * (crouch ? 16 : 11));
 
-  // vertical
-  if (input.jump && rt.grounded && !crouch && p.stamina > 8) { rt.vy = 4.4; rt.grounded = false; p.stamina -= 6; }
-  rt.vy -= 17 * dt;
+  // vertical: one smooth ballistic arc (about 0.75 m of clearance)
+  const wasGrounded = rt.grounded;
+  if (input.jump && rt.grounded && !crouch && p.stamina > 8) { rt.vy = JUMP_SPEED; rt.grounded = false; p.stamina -= 6; }
+  if (!rt.grounded) rt.vy -= GRAVITY * dt;
 
   // move in short sub-steps so fast movement or a long frame can't tunnel
-  // through thin walls, fences or doors
+  // through thin walls, fences or doors. On the ground the body steps over
+  // anything lower than STEP; in the air the feet are tucked, so it clears
+  // what the jump has actually lifted it above.
+  const feet = rt.grounded ? STEP : AIR_STEP;
   let nx = p.x, nz = p.z;
   const dx = rt.vx * dt, dz = rt.vz * dt;
   const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.12));
   for (let i = 0; i < steps; i++) {
-    const res = sim.world.resolveCircle(nx + dx / steps, nz + dz / steps, RADIUS, p.y + 0.32, p.y + (crouch ? 1.2 : 1.75));
+    const res = sim.world.resolveCircle(nx + dx / steps, nz + dz / steps, RADIUS, p.y + feet, p.y + (crouch ? 1.2 : 1.75));
     nx = res.x; nz = res.z;
   }
   // world bounds
@@ -66,13 +72,19 @@ export function updateMovement(sim, input, dt) {
   const moved = Math.hypot(nx - p.x, nz - p.z);
   p.x = nx; p.z = nz;
   let ny = p.y + rt.vy * dt;
-  const ground = sim.world.groundAt(p.x, p.z, p.y);
+  // ground under the body: terrain, floors, and the tops of objects the feet
+  // can reach (stepping up, or landing on something after a jump)
+  const ground = sim.world.groundAt(p.x, p.z, p.y, 0.6, RADIUS * 0.7, wasGrounded ? STEP + 0.02 : AIR_STEP + 0.02);
   if (ny <= ground) {
-    if (!rt.grounded && rt.vy < -7) sim.events.emit('sfx', { id: 'land', x: p.x, z: p.z });
+    if (!wasGrounded) sim.events.emit('sfx', { id: 'land', x: p.x, z: p.z, hard: rt.vy < -7 });
+    if (!wasGrounded) rt.landV = -rt.vy;
     ny = ground; rt.vy = 0; rt.grounded = true;
-  } else if (ny - ground > 0.05) rt.grounded = rt.vy <= 0 && ny - ground < 0.08;
-  // walking down small steps/slopes: snap
-  if (rt.grounded === false && rt.vy <= 0 && ny - ground < 0.35) { ny = ground; rt.vy = 0; rt.grounded = true; }
+  } else if (wasGrounded && rt.vy <= 0 && ny - ground < 0.4) {
+    // walking off a step or down a slope: stay on the ground
+    ny = ground; rt.vy = 0; rt.grounded = true;
+  } else {
+    rt.grounded = false;
+  }
   p.y = ny;
 
   // footsteps & noise
@@ -181,9 +193,9 @@ export function eyePos(sim) {
 }
 
 // Where does a ray hit the static world/terrain? returns distance
-export function worldRayDist(sim, o, d, maxT, ignoreStructures = false) {
+export function worldRayDist(sim, o, d, maxT, ignoreStructures = false, porous = false) {
   const hit = sim.world.raycast(o.x, o.y, o.z, d.x, d.y, d.z, maxT,
-    (c) => c.tag !== 'furniture' && (!ignoreStructures || c.tag !== 'structure') && c.solid !== false);
+    (c) => c.tag !== 'furniture' && (!ignoreStructures || c.tag !== 'structure') && c.solid !== false, porous);
   let t = hit ? hit.t : maxT;
   // terrain march
   for (let s = 0.5; s < t; s += 0.75) {
@@ -193,7 +205,7 @@ export function worldRayDist(sim, o, d, maxT, ignoreStructures = false) {
 }
 
 function castShot(sim, o, d, w, range) {
-  const wallT = worldRayDist(sim, o, d, range);
+  const wallT = worldRayDist(sim, o, d, range, false, true);
   let best = null;
   for (const c of sim.creatures) {
     if (!c.alive || c.incorporeal || c.hiddenUntil > sim.clockSeconds) continue;
@@ -208,6 +220,14 @@ function castShot(sim, o, d, w, range) {
     const t = raySphere(o, d, { x: c.x, y: c.y + 1.4, z: c.z }, 0.8);
     if (t >= 0 && t < wallT) sim.events.emit('hollowDisperse', { c });
   }
+  // hens out in the pen (not roosting inside the coop)
+  let hen = null;
+  for (const c of sim.rt.chickens || []) {
+    if (c.inside) continue;
+    const t = raySphere(o, d, henCentre(c), HEN_HIT.r);
+    if (t >= 0 && t < wallT && (!best || t < best.t) && (!hen || t < hen.t)) hen = { t, c };
+  }
+  if (hen) { killChicken(sim, hen.c); return { hit: true, t: hen.t, hen: true }; }
   if (best) {
     let dmg = w.damage * best.h.mult;
     if (w.pellets > 1) dmg *= clamp(1.25 - best.t / range, 0.3, 1.1);

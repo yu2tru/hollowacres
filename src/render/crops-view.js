@@ -150,6 +150,7 @@ function plantGeo(crop, stage) {
   return geo;
 }
 
+const SOIL_T = 0.08, SOIL_TOP = 0.018; // soil layer thickness and its surface above the terrain
 const LAYOUT = { wheat: 3, corn: 2, potato: 2, tomato: 2, strawberry: 2, pumpkin: 1 }; // n x n per plot
 
 export class CropsView {
@@ -160,7 +161,8 @@ export class CropsView {
     const plots = sim.state.plots;
     this.plotIndex = new Map(plots.map((p, i) => [p.id, i]));
     // beds
-    const bedGeo = new THREE.BoxGeometry(PLOT_SIZE, 0.22, PLOT_SIZE, 1, 1, 1);
+    // tilled soil: a thin layer whose surface sits just above the ground (flush, no raised box)
+    const bedGeo = new THREE.BoxGeometry(PLOT_SIZE, SOIL_T, PLOT_SIZE, 1, 1, 1);
     const uv = bedGeo.attributes.uv;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 0.8, uv.getY(i) * 0.8);
     this.beds = new THREE.InstancedMesh(bedGeo, M.soil, plots.length);
@@ -204,8 +206,8 @@ export class CropsView {
     st.plots.forEach((p, i) => {
       const owned = plotOwned(st, p);
       const y = heightAt(p.x, p.z);
-      tp.set(p.x, owned ? y + 0.02 : y - 0.12, p.z);
-      ts.set(1, owned ? 1 : 0.4, 1);
+      tp.set(p.x, owned ? y + SOIL_TOP - SOIL_T / 2 : y - SOIL_T, p.z);
+      ts.set(1, 1, 1);
       tq.identity();
       this.beds.setMatrixAt(i, tm.compose(tp, tq, ts));
       const wet = p.moisture > 0 ? 0.62 + (1 - p.moisture) * 0.15 : 1;
@@ -214,7 +216,7 @@ export class CropsView {
       this.beds.setColorAt(i, col);
       if (!owned) return;
       if (p.dead) {
-        tp.set(p.x, y + 0.12, p.z); tq.setFromEuler(te.set(0, hash2(i, 3, 1) * 6, 0)); ts.set(1, 1, 1);
+        tp.set(p.x, y + SOIL_TOP, p.z); tq.setFromEuler(te.set(0, hash2(i, 3, 1) * 6, 0)); ts.set(1, 1, 1);
         this.debris.setMatrixAt(dn++, tm.compose(tp, tq, ts));
         return;
       }
@@ -232,7 +234,7 @@ export class CropsView {
         tq.setFromEuler(te.set(tilt, hash2(i, a * 3 + b, 7) * 6.28, dmg * 0.6 * (hz - 0.5)));
         const sc = (0.85 + hx * 0.3) * (1 - dmg * 0.35);
         ts.set(sc, sc * (1 - dmg * 0.45), sc);
-        tp.set(x, y + 0.12, z);
+        tp.set(x, y + SOIL_TOP, z);
         const idx = counts[key]++;
         m.setMatrixAt(idx, tm.compose(tp, tq, ts));
         const thirst = p.moisture <= 0 ? 0.25 : 0;

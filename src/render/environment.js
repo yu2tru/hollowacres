@@ -1,10 +1,11 @@
 // The farm's fixed buildings, interiors and set dressing.
 import * as THREE from 'three';
-import { BUILDINGS, FIXTURES, ROAD, PROPS, COMPOUND } from '../data/layout.js';
+import { BUILDINGS, FIXTURES, ROAD, PROPS, COMPOUND, PIPE_Y, SHED_ITEMS, roadPosts } from '../data/layout.js';
 import { heightAt } from '../sim/terrain.js';
 import { worldUV, mergeList, bx, cy, mk, wallGeo, textTexture } from './build-helpers.js';
 import { addWind } from './materials.js';
 import { truckModel, tractorModel, shippingBinModel, tankLadder } from './models.js';
+import { model } from './assets.js';
 
 export function buildEnvironment(scene, M) {
   const refs = { windows: [], lamps: [], screens: {} };
@@ -128,8 +129,10 @@ function buildFarmhouse(root, M, refs) {
   const bulb = mk(new THREE.SphereGeometry(0.07, 10, 8).translate(lampPos.x, lampPos.y - 0.1, lampPos.z + 0.08), M.lampOn, false, false);
   porch.add(bulb);
   refs.lamps.push({ pos: new THREE.Vector3(H.x + lampPos.x, base + lampPos.y - 0.15, H.z + D / 2 + lampPos.z + 0.25), kind: 'porch' });
-  // rocking chair
-  porch.add(mk(mergeList([bx(0.55, 0.06, 0.5, 2.6, F + 0.45, 1.2), bx(0.55, 0.7, 0.06, 2.6, F + 0.8, 0.95, -0.2), bx(0.06, 0.06, 0.8, 2.35, F + 0.1, 1.2), bx(0.06, 0.06, 0.8, 2.85, F + 0.1, 1.2)]), M.wood));
+  // rocking chair (PROPS.rockingChair, on the porch boards, facing the yard)
+  { const c = PROPS.rockingChair, ch = model('rockingchair');
+    if (ch) { ch.position.set(c.x - H.x, F, c.z - H.z - D / 2); ch.rotation.y = c.rot; porch.add(ch); }
+    else porch.add(mk(mergeList([bx(0.55, 0.06, 0.5, 2.6, F + 0.45, 1.2), bx(0.55, 0.7, 0.06, 2.6, F + 0.8, 0.95, -0.2), bx(0.06, 0.06, 0.8, 2.35, F + 0.1, 1.2), bx(0.06, 0.06, 0.8, 2.85, F + 0.1, 1.2)]), M.wood)); }
   g.add(porch);
 
   // door (pivot at hinge)
@@ -153,11 +156,15 @@ function buildFarmhouse(root, M, refs) {
   // bed
   {
     const [x, z] = L(FIXTURES.bed.x, FIXTURES.bed.z);
-    I.add(mk(mergeList([bx(2.0, 0.35, 2.3, x, F + 0.25, z), bx(2.0, 0.9, 0.08, x, F + 0.5, z - 1.15), bx(2.0, 0.55, 0.08, x, F + 0.3, z + 1.15)]), M.woodDark));
-    I.add(mk(bx(1.85, 0.2, 2.1, x, F + 0.52, z), M.white));
-    I.add(mk(bx(1.9, 0.08, 1.5, x, F + 0.64, z + 0.3), M.flannel));
-    I.add(mk(bx(0.6, 0.12, 0.35, x - 0.45, F + 0.68, z - 0.8), M.white));
-    I.add(mk(bx(0.6, 0.12, 0.35, x + 0.45, F + 0.68, z - 0.8), M.white));
+    const bed = model('bed');   // headboard against the north wall (-z)
+    if (bed) { bed.position.set(x, F, z); I.add(bed); }
+    else {
+      I.add(mk(mergeList([bx(2.0, 0.35, 2.3, x, F + 0.25, z), bx(2.0, 0.9, 0.08, x, F + 0.5, z - 1.15), bx(2.0, 0.55, 0.08, x, F + 0.3, z + 1.15)]), M.woodDark));
+      I.add(mk(bx(1.85, 0.2, 2.1, x, F + 0.52, z), M.white));
+      I.add(mk(bx(1.9, 0.08, 1.5, x, F + 0.64, z + 0.3), M.flannel));
+      I.add(mk(bx(0.6, 0.12, 0.35, x - 0.45, F + 0.68, z - 0.8), M.white));
+      I.add(mk(bx(0.6, 0.12, 0.35, x + 0.45, F + 0.68, z - 0.8), M.white));
+    }
   }
   // desk with laptop & monitor
   {
@@ -328,7 +335,8 @@ function buildShed(root, M) {
     { len: D, pos: [-W / 2, 0], ry: -Math.PI / 2, ops: [] },
   ];
   for (const w of walls) {
-    const m = mk(worldUV(wallGeo(w.len + T, WH + (w.pos[1] < 0 ? 0 : 0), T, w.ops), 2), M.wood);
+    // the lean-to roof is 0.9 m higher at the back: the north wall goes up to meet it
+    const m = mk(worldUV(wallGeo(w.len + T, WH + (w.pos[1] < 0 ? 0.9 : 0), T, w.ops), 2), M.wood);
     m.position.set(w.pos[0], 0.15, w.pos[1]); m.rotation.y = w.ry; g.add(m);
   }
   const roof = bx(W + 0.8, 0.08, D + 0.8, 0, WH + 0.6, 0, 0.2);
@@ -342,8 +350,15 @@ function buildShed(root, M) {
   }
   // jerrycans & shelf
   const red = new THREE.MeshStandardMaterial({ color: 0x8a1a12, roughness: 0.5, metalness: 0.2 });
-  for (let i = 0; i < 3; i++) g.add(mk(mergeList([bx(0.35, 0.45, 0.17, -1.6 + i * 0.45, 0.4, -D / 2 + 0.5), bx(0.12, 0.05, 0.04, -1.6 + i * 0.45, 0.66, -D / 2 + 0.5)]), red));
-  g.add(mk(worldUV(mergeList([bx(2.2, 0.04, 0.45, 1.0, 1.0, -D / 2 + 0.35), bx(2.2, 0.04, 0.45, 1.0, 1.6, -D / 2 + 0.35)]), 1), M.wood));
+  // jerrycans stand on the slab (top of slab = 0.15)
+  for (const c of SHED_ITEMS.cans) g.add(mk(mergeList([bx(0.35, 0.45, 0.17, c.x, 0.15 + 0.225, c.z), bx(0.12, 0.05, 0.04, c.x, 0.15 + 0.475, c.z), bx(0.03, 0.12, 0.03, c.x + 0.12, 0.15 + 0.5, c.z)]), red));
+  // shelf unit: four uprights and three boards, standing on the slab
+  { const sh = SHED_ITEMS.shelf, y0 = 0.15, parts = [];
+    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) parts.push(bx(0.05, sh.h, 0.05, sh.x + dx * (sh.w / 2 - 0.03), y0 + sh.h / 2, sh.z + dz * (sh.d / 2 - 0.03)));
+    for (const y of [0.3, 0.95, 1.6]) parts.push(bx(sh.w, 0.04, sh.d, sh.x, y0 + y, sh.z));
+    g.add(mk(worldUV(mergeList(parts), 1), M.wood));
+    // stock on the shelves: oil cans and a toolbox
+    g.add(mk(mergeList([cy(0.08, 0.08, 0.22, 10, sh.x - 0.7, y0 + 1.08, sh.z), cy(0.08, 0.08, 0.22, 10, sh.x - 0.45, y0 + 1.08, sh.z), bx(0.5, 0.2, 0.25, sh.x + 0.5, y0 + 1.07, sh.z), bx(0.4, 0.3, 0.3, sh.x + 0.2, y0 + 0.47, sh.z)]), M.paintGreen)); }
 }
 
 // ---------------------------------------------------------------------------
@@ -361,16 +376,38 @@ function buildProps(root, M, refs) {
     root.add(mk(new THREE.ConeGeometry(t.r + 0.1, 0.6, 28).translate(t.x, y + t.h + 0.3, t.z), M.steel));
     root.add(mk(cy(t.r + 0.25, t.r + 0.3, 0.25, 28, t.x, y + 0.1, t.z), M.concrete));
     const lad = tankLadder(t.r, t.h); lad.position.set(t.x, y, t.z); lad.rotation.y = Math.PI / 2; root.add(lad);
-    root.add(mk(mergeList([cy(0.06, 0.06, 0.5, 10, t.x - t.r - 0.2, y + 0.4, t.z, 0, Math.PI / 2), cy(0.09, 0.09, 0.12, 10, t.x - t.r - 0.45, y + 0.4, t.z, 0, Math.PI / 2)]), M.steel));
+    // outlet from the tank wall down into the ground main (x = -23)
+    root.add(mk(mergeList([cy(0.07, 0.07, 0.5, 10, t.x - t.r - 0.2, y + PIPE_Y, t.z, 0, Math.PI / 2), cy(0.1, 0.1, 0.08, 10, t.x - t.r + 0.02, y + PIPE_Y, t.z, 0, Math.PI / 2)]), M.steel));
   }
   {
     const p = PROPS.pumpHouse, y = at(p.x, p.z);
     root.add(mk(worldUV(bx(p.w, p.h, p.d, p.x, y + p.h / 2, p.z), 1.6), M.wood));
     root.add(mk(worldUV(bx(p.w + 0.6, 0.08, p.d + 0.6, p.x, y + p.h + 0.15, p.z, 0.12), 1.5), M.metalRoof));
     root.add(mk(bx(0.9, 1.8, 0.05, p.x, y + 0.9, p.z - p.d / 2 - 0.02), M.woodDark));
-    // pipe from the pond to the tanks
-    const pipe = [cy(0.09, 0.09, 8, 8, -26, at(-26, 30) + 0.35, 30, 0, Math.PI / 2), cy(0.09, 0.09, 7, 8, -23, at(-23, 34.5) + 0.35, 34.5, Math.PI / 2)];
+    // water main from the pond pump to the tanks, laid along the ground on
+    // concrete saddles; short straight lengths follow the terrain
+    const pipe = [], saddles = [];
+    for (const [x0, z0, x1, z1] of PROPS.pipes) {
+      const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(len / 1.0));
+      const ux = (x1 - x0) / len, uz = (z1 - z0) / len;
+      const pts = [];
+      for (let i = 0; i <= n; i++) { const x = x0 + ux * len * i / n, z = z0 + uz * len * i / n; pts.push(new THREE.Vector3(x, at(x, z) + PIPE_Y, z)); }
+      for (let i = 0; i < n; i++) {
+        const a = pts[i], b = pts[i + 1], d = b.clone().sub(a), L = d.length();
+        const g = new THREE.CylinderGeometry(0.09, 0.09, L + 0.02, 10, 1, true);
+        g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()));
+        g.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+        pipe.push(g);
+        if (i % 2 === 0) saddles.push(bx(0.3, PIPE_Y, 0.22, a.x, at(a.x, a.z) + PIPE_Y / 2 - 0.02, a.z, 0, -Math.atan2(uz, ux) + Math.PI / 2));
+      }
+      for (const q of [pts[0], pts[n]]) { // flanged ends
+        const f = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 12);
+        f.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(ux, 0, uz)));
+        f.translate(q.x, q.y, q.z); pipe.push(f);
+      }
+    }
     root.add(mk(mergeList(pipe), M.steel));
+    root.add(mk(worldUV(mergeList(saddles), 0.8), M.concrete));
   }
   // ---- pump at the pond & trough
   {
@@ -394,11 +431,11 @@ function buildProps(root, M, refs) {
   for (const d of PROPS.drums) root.add(mk(mergeList([cy(0.3, 0.3, 0.9, 18, d.x, at(d.x, d.z) + 0.45, d.z), cy(0.305, 0.305, 0.03, 18, d.x, at(d.x, d.z) + 0.3, d.z), cy(0.305, 0.305, 0.03, 18, d.x, at(d.x, d.z) + 0.6, d.z)]), drum));
   // ---- storage yard: crates, barrels
   for (const c of PROPS.crates) root.add(mk(worldUV(bx(c.w, 1.1, c.d, c.x, at(c.x, c.z) + 0.55, c.z), 0.9), M.wood));
-  root.add(mk(worldUV(bx(1.0, 0.9, 1.0, 41.4, at(41, 8) + 1.55, 8.1, 0, 0.3), 0.9), M.wood));
+  { const c = PROPS.stackedCrate; root.add(mk(worldUV(bx(c.s, c.h, c.s, c.x, at(41, 8) + 1.1 + c.h / 2, c.z, 0, c.rot), 0.9), M.wood)); }
   const barrel = new THREE.MeshStandardMaterial({ color: 0x31475a, roughness: 0.55, metalness: 0.5 });
   for (const b of PROPS.barrels) root.add(mk(cy(0.32, 0.32, 0.92, 14, b.x, at(b.x, b.z) + 0.46, b.z), barrel));
   // ---- old pickup by the house, rusted tractor by the barn
-  { const t = truckModel(); t.position.set(PROPS.truck.x, at(PROPS.truck.x, PROPS.truck.z), PROPS.truck.z); t.rotation.y = PROPS.truck.rot; root.add(t); }
+  { const t = model('truck') || truckModel(); t.position.set(PROPS.truck.x, at(PROPS.truck.x, PROPS.truck.z), PROPS.truck.z); t.rotation.y = PROPS.truck.rot; root.add(t); }
   { const t = tractorModel(); t.position.set(PROPS.tractor.x, at(PROPS.tractor.x, PROPS.tractor.z), PROPS.tractor.z); t.rotation.y = PROPS.tractor.rot; root.add(t); }
   // round hay bales near the pen
   for (const b of PROPS.bales) {
@@ -429,7 +466,7 @@ function buildProps(root, M, refs) {
   // fire pit seating logs
   for (const l of PROPS.logs) {
     const m = mk(cy(0.22, 0.24, 1.8, 10, 0, 0, 0, 0, Math.PI / 2), M.bark);
-    m.position.set(l.x, at(l.x, l.z) + 0.22, l.z); m.rotation.y = -l.rot; root.add(m);
+    m.position.set(l.x, at(l.x, l.z) + 0.22, l.z); m.rotation.y = l.rot; root.add(m); // same rotation as its collider
   }
   // shipping bin
   { const { x, z } = FIXTURES.shippingBin; const g = shippingBinModel(M); g.position.set(x, at(x, z), z); g.rotation.y = Math.PI / 2; root.add(g); }
@@ -472,17 +509,17 @@ function buildProps(root, M, refs) {
     root.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(wire), new THREE.LineBasicMaterial({ color: 0x111111 })));
   }
   // road edge posts along the county road
-  for (let x = -150; x <= 150; x += 18) {
-    const z = ROAD.county.z - ROAD.county.width / 2 - 0.6;
-    if (Math.abs(x - COMPOUND.gate.x) < 6) continue;
-    root.add(mk(bx(0.1, 0.9, 0.1, x, at(x, z) + 0.45, z), M.white, false));
-  }
+  for (const [x, z] of roadPosts()) root.add(mk(bx(0.1, 0.9, 0.1, x, at(x, z) + 0.45, z), M.white, false));
   // wheelbarrow & buckets by the crop walkway
   root.add(mk(mergeList([cy(0.16, 0.13, 0.3, 14, PROPS.bucket.x, at(PROPS.bucket.x, PROPS.bucket.z) + 0.15, PROPS.bucket.z)]), M.steel));
   {
     const g = new THREE.Group(); g.position.set(PROPS.wheelbarrow.x, at(PROPS.wheelbarrow.x, PROPS.wheelbarrow.z), PROPS.wheelbarrow.z); g.rotation.y = PROPS.wheelbarrow.rot;
-    g.add(mk(mergeList([bx(0.7, 0.3, 0.9, 0, 0.45, 0), bx(0.04, 0.04, 1.1, -0.3, 0.45, -0.9), bx(0.04, 0.04, 1.1, 0.3, 0.45, -0.9)]), M.paintGreen));
-    g.add(mk(cy(0.2, 0.2, 0.08, 12, 0, 0.2, 0.45, 0, Math.PI / 2), M.rubber));
+    const wb = model('wheelbarrow');
+    if (wb) g.add(wb);
+    else {
+      g.add(mk(mergeList([bx(0.7, 0.3, 0.9, 0, 0.45, 0.3), bx(0.04, 0.04, 1.1, -0.3, 0.45, -0.6), bx(0.04, 0.04, 1.1, 0.3, 0.45, -0.6)]), M.paintGreen));
+      g.add(mk(cy(0.2, 0.2, 0.08, 12, 0, 0.2, 0.75, 0, Math.PI / 2), M.rubber));
+    }
     root.add(g);
   }
 }

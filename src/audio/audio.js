@@ -181,7 +181,7 @@ export class AudioEngine {
       case 'gen_stop': { const g = o({ ref: 5 }); this.tone(g, { type: 'sawtooth', freq: 60, freqEnd: 15, dur: 1.5, gain: 0.3 }); break; }
       case 'click': this.tone(this.out(null, { bus: this.bus.ui }), { type: 'square', freq: 2400, dur: 0.02, gain: 0.05 }); break;
       case 'battery': case 'medkit': this.noiseBurst(this.out(null), { dur: 0.3, gain: 0.2, filter: 'bandpass', freq: 2000, q: 2 }); break;
-      case 'land': this.noiseBurst(this.out(null), { type: 'brown', dur: 0.15, gain: 0.5, filter: 'lowpass', freq: 300 }); break;
+      case 'land': this.noiseBurst(this.out(null), { type: 'brown', dur: 0.15, gain: e.hard ? 0.5 : 0.22, filter: 'lowpass', freq: 300 }); break;
       case 'hen': { const g = o({ ref: 4 }); for (let i = 0; i < 4; i++) this.tone(g, { type: 'square', freq: rand(700, 1100), freqEnd: rand(400, 600), dur: 0.12, gain: 0.05, at: i * 0.14 }); break; }
       case 'cluck': { const g = o({ ref: 2, rolloff: 1.5 }); for (let i = 0; i < 2; i++) this.tone(g, { type: 'triangle', freq: rand(380, 520), freqEnd: rand(300, 360), dur: 0.08, gain: 0.05, at: i * 0.18 }); break; }
       case 'fire_light': { const g = o({ ref: 3 }); this.noiseBurst(g, { type: 'pink', dur: 1.2, gain: 0.5, filter: 'lowpass', freq: 400, freqEnd: 2000, attack: 0.3 }); break; }

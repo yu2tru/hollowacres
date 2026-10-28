@@ -23,7 +23,7 @@ export const BUILDABLES = {
   },
   generator: {
     id: 'generator', name: 'Generator', cost: 320, mats: { parts: 2 }, hp: 160,
-    w: 1.6, d: 1.0, h: 1.2, blocks: true, breakable: true, capacity: 8, tank: 20, range: 26, level: 1,
+    w: 1.52, d: 1.04, h: 1.0, blocks: true, breakable: true, capacity: 8, tank: 20, range: 26, level: 1, // model 1.5 x 0.97 x 1.02 m
     desc: 'Powers lights and cameras nearby. Burns fuel; louder when loaded.',
     repairMat: 'parts',
   },

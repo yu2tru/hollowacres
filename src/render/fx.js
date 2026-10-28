@@ -51,6 +51,7 @@ export class FX {
         case 'ichor': Object.assign(p, { vx: rnd(3) + (opts.dx || 0) * 2, vy: Math.random() * 2.5, vz: rnd(3) + (opts.dz || 0) * 2, max: 0.6, size: 0.07, r: 0.12, g: 0.1, b: 0.07, a: 1, grav: 9 }); break;
         case 'water': Object.assign(p, { vx: rnd(0.6) + (opts.dx || 0), vy: Math.random() * 0.5, vz: rnd(0.6) + (opts.dz || 0), max: 0.6, size: 0.04, r: 0.75, g: 0.85, b: 0.95, a: 0.7, grav: 9 }); break;
         case 'seed': Object.assign(p, { vx: rnd(1), vy: 0.5 + Math.random(), vz: rnd(1), max: 0.6, size: 0.03, r: 0.7, g: 0.6, b: 0.35, a: 1, grav: 9 }); break;
+        case 'feather': Object.assign(p, { vx: rnd(1.8), vy: 0.8 + Math.random() * 1.6, vz: rnd(1.8), max: 1.6 + Math.random(), size: 0.06, r: 0.92, g: 0.88, b: 0.8, a: 1, grav: 1.2, drag: 2.2 }); break;
         case 'chaff': Object.assign(p, { vx: rnd(1.5), vy: 1 + Math.random() * 1.5, vz: rnd(1.5), max: 1.2, size: 0.05, r: 0.8, g: 0.7, b: 0.4, a: 1, grav: 2, drag: 1.5 }); break;
         case 'spark': Object.assign(p, { vx: rnd(4), vy: Math.random() * 3, vz: rnd(4), max: 0.5, size: 0.05, r: 1, g: 0.75, b: 0.35, a: 1, grav: 9, glow: true }); break;
         case 'smoke': Object.assign(p, { vx: rnd(0.3) + (opts.wind || 0), vy: 0.6 + Math.random() * 0.4, vz: rnd(0.3), max: 2.5, size: 0.3, r: 0.25, g: 0.25, b: 0.26, a: 0.25, grav: 0, drag: 0.5, grow: 0.8 }); break;

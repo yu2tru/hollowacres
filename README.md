@@ -20,7 +20,7 @@ npm run package    # build and refresh HollowAcres.html in the repo root
 npm run preview    # serve the production build
 ```
 
-The build is one self-contained HTML file with no external assets or network calls. Every texture, mesh and sound is generated procedurally at load time.
+The build is one self-contained HTML file (about 7.5 MB) with no external assets or network calls. Six authored 3D models (generator, truck, bed, hand pump, rocking chair, wheelbarrow) are embedded in it; every other texture, mesh and sound is generated procedurally at load time.
 
 ## First time?
 
@@ -115,17 +115,18 @@ Presets are Low, Medium, High and Epic (auto-detected on first run), plus indivi
 
 - **Engine.** The brief suggested Unreal Engine 5. It can't run, build or be tested in this headless Linux environment, and delivering an untestable UE5 project would break the "test before claiming done" requirement. Three.js + Vite gives real-time 3D, a fully testable simulation and a game that runs on any PC with a browser.
 - **No ray tracing.** WebGL has no hardware RT. The "advanced lighting" equivalents are GTAO, sky-driven image-based lighting, PCF soft shadows and bloom. The core look doesn't depend on any of them.
-- **Procedural assets.** No art assets were available, so all materials, meshes and sounds are generated. They share one palette and material strategy so the world stays coherent, but they are stylised compared with photoscanned content. This is the biggest gap against "photorealistic", and swapping in authored glTF models and textures is the natural next step. The data/layout and view modules are structured for it.
+- **Mostly procedural assets.** Apart from six authored glTF models, all materials, meshes and sounds are generated. They share one palette and material strategy so the world stays coherent, but they are stylised compared with photoscanned content. More authored models can be added the same way: put the source .glb in a release, add it to `tools/optimize-models.mjs` (simplifies meshes, converts textures to WebP, meshopt-compresses geometry into `src/assets/models/`), then give it a size in `src/render/assets.js` and a matching collider in `src/data/layout.js`. If a model fails to load, the built-in one is used.
 - **Creature animation** is procedural (gait cycles on simple rigs), not mocap.
 
 ## Testing
 
 ```bash
-npm test                                   # 62 unit tests: farming, economy, structures, power, nav, AI, combat, save/load,
-                                           # collision against every solid prop and building, and the full tutorial played through
+npm test                                   # 68 unit tests: farming, economy, structures, power, nav, AI, combat, save/load,
+                                           # collision against every solid prop and building, jumping, the full tutorial played through
 node tests/sim/playthrough.mjs 12 diligent # 12-day headless playthrough: active farmer who builds, repairs and fights
 node tests/sim/playthrough.mjs 12 neglect  # 12-day run of a farmer who never defends (checks there's no death spiral)
 node tests/e2e/tour.mjs barn,crops         # screenshot tour of named viewpoints into tests/e2e/tour/
+node tests/e2e/collider-audit.mjs          # samples every visible surface and lists any no collider covers
 npm run build && node tests/e2e/smoke.mjs --shots   # real browser (headless Chromium): loads the game, goes through the intro and tutorial start, renders day/dusk/night, spawns creatures, fails on any page error
 ```
 

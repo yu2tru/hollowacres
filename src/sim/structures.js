@@ -46,11 +46,16 @@ export function attachStructure(sim, s) {
     const b = BUILDINGS[s.building];
     const dp = b.doorPos;
     shape = { kind: 'box', x: dp.x, z: dp.z, hw: dp.width / 2 + 0.05, hd: 0.12, rot: dp.rot };
+    if (s.building === 'barn') {
+      // the sliding leaves hang ~0.2 m outside the wall on their track: cover them
+      const ox = Math.sign(dp.x - b.x) * (Math.abs(dp.x - b.x) > Math.abs(dp.z - b.z) ? 1 : 0), oz = Math.sign(dp.z - b.z) * (ox ? 0 : 1);
+      Object.assign(shape, { x: dp.x + ox * 0.12, z: dp.z + oz * 0.12, hd: 0.24 });
+    }
     y0 = b.baseY; y1 = b.baseY + (b.floor || 0) + 2.25;
     s.x = dp.x; s.z = dp.z; s.rot = dp.rot;
   } else if (s.type === 'pump') {
-    shape = { kind: 'circle', x: s.x, z: s.z, r: 0.45 };
-    y0 = heightAt(s.x, s.z) - 0.5; y1 = y0 + 1.6;
+    shape = { kind: 'circle', x: s.x, z: s.z, r: 0.3 };      // cast-iron column on its base
+    y0 = heightAt(s.x, s.z) - 0.5; y1 = y0 + 0.5 + 1.75;
   } else {
     shape = footprint(s.type, s.x, s.z, s.rot, { len: s.len });
     y0 = heightAt(s.x, s.z) - 0.3; y1 = y0 + (def.h || 1) + 0.3;
@@ -60,15 +65,40 @@ export function attachStructure(sim, s) {
   s.blocksNav = !!(def.blocks || s.type === 'door');
   s.breakable = !!def.breakable || s.type === 'door';
   if (s.type === 'firepit' || s.type === 'solar') s.blocksNav = true;
+  // Parts that stick out of the main footprint get their own colliders.
+  col.extras = extraShapes(s).map(([lx, lz, hw, hd, h, base = -0.3]) => {
+    const c = Math.cos(s.rot || 0), sn = Math.sin(s.rot || 0), g = heightAt(s.x, s.z);
+    return sim.world.add({ kind: 'box', x: s.x + lx * c + lz * sn, z: s.z - lx * sn + lz * c, hw, hd, rot: s.rot || 0 },
+      { y0: g + base, y1: g + h, tag: 'structure', ref: s, opaque: false });
+  });
+  // Bullets pass between fence rails; only the wood that is still standing stops them.
+  if (s.type === 'fence') col.bands = () => { const g = heightAt(s.x, s.z); return fenceRails(s).map((y) => [g + y - 0.07, g + y + 0.07]); };
   sim.rt.cols.set(s.id, col);
   if (s.blocksNav) sim.nav.markStructure(s, col);
   syncStructureCollision(sim, s);
 }
 
+// [local x, local z, half width, half depth, height, bottom] - must match the models drawn
+function extraShapes(s) {
+  if (s.type === 'coop') return [[-1.0, 1.8, 0.62, 0.32, 1.27], [0.6, 2.2, 0.32, 0.75, 0.68]]; // nest box, hen ramp
+  if (s.type === 'pump') return [[0, 0.42, 0.16, 0.2, 1.05, 0.45], [0, -0.5, 0.05, 0.36, 1.75, 0.9]]; // bucket on the spout, handle
+  if (s.type === 'solar') return [[-(s.len || 34) / 2 - 0.6, 0, 0.32, 0.2, 0.92]]; // inverter at the west end
+  return [];
+}
+
 export function detachStructure(sim, s) {
   const col = sim.rt.cols.get(s.id);
-  if (col) { sim.world.remove(col); sim.rt.cols.delete(s.id); }
+  if (col) { for (const e of col.extras || []) sim.world.remove(e); sim.world.remove(col); sim.rt.cols.delete(s.id); }
   sim.nav.clearStructureCells(s);
+}
+
+// Rail heights of a fence segment still standing at its current damage. The
+// renderer draws exactly these, and bullets are stopped only by them.
+export const FENCE_RAIL_Y = [0.35, 0.7, 1.05];
+export function fenceRails(s) {
+  if (s.hp <= 0) return [];
+  const r = s.hp / s.maxHp;
+  return FENCE_RAIL_Y.filter((y, i) => !((r < 0.35 && i !== 0) || (r < 0.7 && i === 2)));
 }
 
 // Broken or open structures stop blocking movement.
@@ -79,6 +109,7 @@ export function syncStructureCollision(sim, s) {
   if (s.type === 'door' || s.type === 'gate') col.enabled = !s.open && !broken;
   else if (['barricade', 'fence', 'coop'].includes(s.type)) col.enabled = !broken;
   else col.enabled = true;
+  for (const e of col.extras || []) e.enabled = s.type === 'coop' ? !broken : true;
 }
 
 // Closest point just outside a structure's footprint, from (x, z) - where a
