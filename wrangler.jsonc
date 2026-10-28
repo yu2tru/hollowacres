@@ -1,0 +1,8 @@
+// Cloudflare Workers deploy: build the single-file game with Vite and serve
+// dist/ as static assets (no Worker script needed).
+{
+  "name": "hollowacres",
+  "compatibility_date": "2025-09-01",
+  "build": { "command": "npm run build" },
+  "assets": { "directory": "./dist" }
+}
